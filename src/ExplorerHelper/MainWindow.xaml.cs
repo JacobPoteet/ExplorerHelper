@@ -40,12 +40,45 @@ public partial class MainWindow : Window
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "ExplorerHelper", "WebView2"),
         };
+
+        UpdateSortIndicators();
     }
 
     public void LoadFolder(string path)
     {
         _vm.LoadFolder(path);
         Title = $"Explorer Helper — {path}";
+    }
+
+    // --- Column sorting (issue #4) ---------------------------------------------------
+
+    private void ColumnHeader_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is GridViewColumnHeader { Tag: string key })
+        {
+            _vm.SortBy(key);
+            UpdateSortIndicators();
+        }
+    }
+
+    /// <summary>Shows a ▲/▼ arrow on the active column header and clears it from the others.</summary>
+    private void UpdateSortIndicators()
+    {
+        var arrow = _vm.SortDescending ? " ▼" : " ▲";
+        HdrName.Content = "Name" + (_vm.SortMode == "Name" ? arrow : string.Empty);
+        HdrDate.Content = "Date modified" + (_vm.SortMode == "Date" ? arrow : string.Empty);
+        HdrType.Content = "Type" + (_vm.SortMode == "Type" ? arrow : string.Empty);
+        HdrSize.Content = "Size" + (_vm.SortMode == "Size" ? arrow : string.Empty);
+    }
+
+    /// <summary>Keeps the Name column filling the space the fixed columns leave behind.</summary>
+    private void FileList_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var fixedWidth = IconColumn.ActualWidth + DateColumn.ActualWidth
+            + TypeColumn.ActualWidth + SizeColumn.ActualWidth;
+        var available = FileList.ActualWidth - fixedWidth - SystemParameters.VerticalScrollBarWidth - 12;
+        if (available > 120)
+            NameColumn.Width = available;
     }
 
     private void FileList_KeyDown(object sender, KeyEventArgs e)
