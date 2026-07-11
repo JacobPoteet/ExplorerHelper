@@ -10,6 +10,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        DispatcherUnhandledException += (_, args) =>
+        {
+            MessageBox.Show(args.Exception.Message, "Explorer Helper — unexpected error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+        };
+
         // Launched from the Explorer context menu the folder arrives as the first argument.
         var folder = e.Args.FirstOrDefault(Directory.Exists);
 

@@ -25,7 +25,10 @@ public static class RecycleBinService
     private const ushort FOF_NOCONFIRMATION = 0x0010;
     private const ushort FOF_SILENT = 0x0004;
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
+    // Natural alignment is required here: forcing Pack = 1 misaligns the fields after
+    // the string pointers on x64, so the shell writes hNameMappings to protected memory
+    // and the process dies with an AccessViolationException.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEOPSTRUCT
     {
         public IntPtr hwnd;
