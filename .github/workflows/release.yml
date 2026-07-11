@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Derive version from tag
+        id: version
+        shell: pwsh
+        run: '"version=$($env:GITHUB_REF_NAME -replace ''^v'','''')" | Out-File -FilePath $env:GITHUB_OUTPUT -Append'
+
+      - name: Build zip + installer
+        shell: pwsh
+        run: ./build.ps1 -Version ${{ steps.version.outputs.version }} -Installer
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/ExplorerHelper-*-win-x64.zip
+            artifacts/ExplorerHelper-Setup-*.exe
