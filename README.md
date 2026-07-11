@@ -1,5 +1,9 @@
 # Explorer Helper
 
+[![Download latest](https://img.shields.io/github/v/release/JacobPoteet/ExplorerHelper?label=download&sort=semver)](https://github.com/JacobPoteet/ExplorerHelper/releases/latest)
+[![CI](https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Clean and organize any folder straight from the Windows Explorer right-click menu.
 Right-click a folder (or the background of an open folder), hit **Clean this folder**,
 and triage its contents with previews and keyboard shortcuts.
@@ -25,7 +29,8 @@ and triage its contents with previews and keyboard shortcuts.
 
 ## Install
 
-Grab the latest `ExplorerHelper-Setup-*.exe` from [Releases](../../releases) and run it.
+**[⬇ Download the latest installer](https://github.com/JacobPoteet/ExplorerHelper/releases/latest)** —
+grab `ExplorerHelper-Setup-*.exe` from the release assets and run it.
 It installs per-user (no admin prompt) and registers the context-menu entries; uninstalling
 removes them again. A portable zip is also published with each release — with the portable
 version, use the **Add context menu** button inside the app.
