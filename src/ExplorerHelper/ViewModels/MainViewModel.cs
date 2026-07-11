@@ -12,6 +12,11 @@ public partial class MainViewModel : ObservableObject
 {
     public ObservableCollection<FileEntry> Files { get; } = [];
 
+    /// <summary>Names applied during this session, most-recent first — the quick-rename palette.</summary>
+    public ObservableCollection<string> RecentNames { get; } = [];
+
+    private const int MaxRecentNames = 12;
+
     [ObservableProperty]
     private string _folderPath = string.Empty;
 
@@ -141,6 +146,85 @@ public partial class MainViewModel : ObservableObject
 
         Refresh();
         return null;
+    }
+
+    /// <summary>
+    /// Renames the entry to <paramref name="stem"/> (extension preserved), auto-numbering to
+    /// avoid collisions — "Clip", then "Clip 2", "Clip 3", … The rename happens in place so the
+    /// item keeps its list position, and the stem is remembered in the palette. Returns an error
+    /// message, or null on success (including the no-op where the file already has that name).
+    /// </summary>
+    public string? QuickRename(FileEntry entry, string stem)
+    {
+        stem = stem.Trim();
+        if (string.IsNullOrWhiteSpace(stem))
+            return null;
+
+        var dir = Path.GetDirectoryName(entry.FullPath)!;
+        var ext = Path.GetExtension(entry.FullPath); // preserves original case; "" for folders
+
+        // Be forgiving if the user typed the extension anyway — the UI already shows it fixed.
+        if (ext.Length > 0 && stem.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+            stem = stem[..^ext.Length].TrimEnd();
+
+        if (string.IsNullOrWhiteSpace(stem))
+            return null;
+        if (stem.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            return "The name contains invalid characters.";
+
+        RememberName(stem);
+
+        var targetName = NextAvailableName(dir, stem, ext, entry.FullPath);
+        var targetPath = Path.Combine(dir, targetName);
+
+        // Already named this (case-insensitive) — nothing to do on disk.
+        if (string.Equals(targetPath, entry.FullPath, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            if (entry.IsDirectory)
+                Directory.Move(entry.FullPath, targetPath);
+            else
+                File.Move(entry.FullPath, targetPath);
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+
+        entry.UpdatePath(targetPath);
+        UpdateStatus();
+        return null;
+    }
+
+    /// <summary>
+    /// First free name of the form "stem.ext", then "stem 2.ext", "stem 3.ext", … The entry's
+    /// own current path counts as free, so re-applying the same name is a no-op rather than a bump.
+    /// </summary>
+    private static string NextAvailableName(string directory, string stem, string extension, string currentPath)
+    {
+        for (var n = 1; ; n++)
+        {
+            var candidate = (n == 1 ? stem : $"{stem} {n}") + extension;
+            var candidatePath = Path.Combine(directory, candidate);
+
+            if (string.Equals(candidatePath, currentPath, StringComparison.OrdinalIgnoreCase))
+                return candidate;
+            if (!File.Exists(candidatePath) && !Directory.Exists(candidatePath))
+                return candidate;
+        }
+    }
+
+    private void RememberName(string stem)
+    {
+        // Move-to-front, case-insensitive de-dupe, capped length.
+        var existing = RecentNames.FirstOrDefault(n => string.Equals(n, stem, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+            RecentNames.Remove(existing);
+        RecentNames.Insert(0, stem);
+        while (RecentNames.Count > MaxRecentNames)
+            RecentNames.RemoveAt(RecentNames.Count - 1);
     }
 
     private void ApplyView()
