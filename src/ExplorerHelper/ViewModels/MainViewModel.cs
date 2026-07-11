@@ -17,6 +17,12 @@ public partial class MainViewModel : ObservableObject
 
     private const int MaxRecentNames = 12;
 
+    /// <summary>The distinct file types present in the folder, each toggleable on/off (issue #5).</summary>
+    public ObservableCollection<TypeFilter> TypeFilters { get; } = [];
+
+    // Set while toggling many type filters at once so ApplyView runs once, not per item.
+    private bool _suspendApplyView;
+
     [ObservableProperty]
     private string _folderPath = string.Empty;
 
@@ -29,6 +35,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _sortMode = "Name";
 
+    /// <summary>Sort direction of the active column. Toggled by clicking the same header again.</summary>
+    public bool SortDescending { get; private set; }
+
     [ObservableProperty]
     private string _statusText = "No folder loaded";
 
@@ -39,16 +48,26 @@ public partial class MainViewModel : ObservableObject
     public string ContextMenuButtonText =>
         ContextMenuRegistered ? "Remove context menu" : "Add context menu";
 
-    public static readonly string[] SortModes = ["Name", "Size", "Date", "Type"];
-
-    public string[] SortModesList => SortModes;
-
     private List<FileEntry> _allEntries = [];
     private CancellationTokenSource? _thumbnailCts;
 
     partial void OnFilterTextChanged(string value) => ApplyView();
 
-    partial void OnSortModeChanged(string value) => ApplyView();
+    /// <summary>
+    /// Sorts by the given column key. Clicking the active column again reverses direction;
+    /// switching to a different column starts ascending.
+    /// </summary>
+    public void SortBy(string key)
+    {
+        if (SortMode == key)
+            SortDescending = !SortDescending;
+        else
+        {
+            SortMode = key;
+            SortDescending = false;
+        }
+        ApplyView();
+    }
 
     public void LoadFolder(string path)
     {
@@ -63,6 +82,7 @@ public partial class MainViewModel : ObservableObject
             .Select(info => new FileEntry(info))
             .ToList();
 
+        BuildTypeFilters();
         ApplyView();
         LoadThumbnailsInBackground();
     }
@@ -227,6 +247,48 @@ public partial class MainViewModel : ObservableObject
             RecentNames.RemoveAt(RecentNames.Count - 1);
     }
 
+    /// <summary>Rebuilds the type-filter list from the folder's entries — all types start shown.</summary>
+    private void BuildTypeFilters()
+    {
+        foreach (var filter in TypeFilters)
+            filter.PropertyChanged -= TypeFilterChanged;
+        TypeFilters.Clear();
+
+        var groups = _allEntries
+            .GroupBy(e => e.Extension)
+            .OrderBy(g => g.Key == "Folder" ? 0 : 1) // folders first, then extensions A→Z
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groups)
+        {
+            var filter = new TypeFilter(group.Key, group.Count());
+            filter.PropertyChanged += TypeFilterChanged;
+            TypeFilters.Add(filter);
+        }
+    }
+
+    private void TypeFilterChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TypeFilter.IsChecked) && !_suspendApplyView)
+            ApplyView();
+    }
+
+    [RelayCommand]
+    private void ShowAllTypes() => SetAllTypes(true);
+
+    [RelayCommand]
+    private void HideAllTypes() => SetAllTypes(false);
+
+    private void SetAllTypes(bool isChecked)
+    {
+        // Toggle everything, then refresh the view a single time.
+        _suspendApplyView = true;
+        foreach (var filter in TypeFilters)
+            filter.IsChecked = isChecked;
+        _suspendApplyView = false;
+        ApplyView();
+    }
+
     private void ApplyView()
     {
         IEnumerable<FileEntry> view = _allEntries;
@@ -234,14 +296,29 @@ public partial class MainViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(FilterText))
             view = view.Where(f => f.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase));
 
-        // Folders first, then the chosen ordering
-        view = SortMode switch
+        // Type filter: keep only entries whose type is currently checked.
+        var hidden = TypeFilters.Where(t => !t.IsChecked).Select(t => t.Key).ToHashSet();
+        if (hidden.Count > 0)
+            view = view.Where(f => !hidden.Contains(f.Extension));
+
+        // Folders always first, then the active column in the chosen direction.
+        var ordered = view.OrderBy(f => !f.IsDirectory ? 1 : 0);
+        ordered = SortMode switch
         {
-            "Size" => view.OrderBy(f => !f.IsDirectory ? 1 : 0).ThenByDescending(f => f.SizeBytes),
-            "Date" => view.OrderBy(f => !f.IsDirectory ? 1 : 0).ThenByDescending(f => f.Modified),
-            "Type" => view.OrderBy(f => !f.IsDirectory ? 1 : 0).ThenBy(f => f.Extension).ThenBy(f => f.Name),
-            _ => view.OrderBy(f => !f.IsDirectory ? 1 : 0).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase),
+            "Size" => SortDescending
+                ? ordered.ThenByDescending(f => f.SizeBytes)
+                : ordered.ThenBy(f => f.SizeBytes),
+            "Date" => SortDescending
+                ? ordered.ThenByDescending(f => f.Modified)
+                : ordered.ThenBy(f => f.Modified),
+            "Type" => SortDescending
+                ? ordered.ThenByDescending(f => f.Extension).ThenByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase)
+                : ordered.ThenBy(f => f.Extension).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase),
+            _ => SortDescending
+                ? ordered.ThenByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase)
+                : ordered.ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase),
         };
+        view = ordered;
 
         Files.Clear();
         foreach (var entry in view)

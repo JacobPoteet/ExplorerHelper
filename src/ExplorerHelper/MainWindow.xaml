@@ -18,6 +18,15 @@
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="#E8E8EC" />
         </Style>
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="#2A2C34" />
+            <Setter Property="Foreground" Value="#E8E8EC" />
+            <Setter Property="BorderBrush" Value="#4A4C58" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -33,9 +42,39 @@
                     Command="{Binding ToggleContextMenuCommand}" />
             <Button DockPanel.Dock="Right" Content="Open in Explorer" Command="{Binding OpenInExplorerCommand}" />
             <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" />
-            <ComboBox DockPanel.Dock="Right" Width="90" Margin="8,0,0,0" VerticalAlignment="Center"
-                      ItemsSource="{Binding SortModesList}" SelectedItem="{Binding SortMode}" />
-            <TextBlock DockPanel.Dock="Right" Text="Sort:" VerticalAlignment="Center" Margin="12,0,0,0" />
+            <ToggleButton x:Name="TypesButton" DockPanel.Dock="Right" Content="Types ▾"
+                          Padding="10,5" Margin="4,0,0,0"
+                          Background="#33353F" Foreground="#E8E8EC" BorderBrush="#4A4C58"
+                          ToolTip="Show or hide files by type" />
+            <Popup PlacementTarget="{Binding ElementName=TypesButton}" Placement="Bottom"
+                   StaysOpen="False" AllowsTransparency="True"
+                   IsOpen="{Binding IsChecked, ElementName=TypesButton, Mode=TwoWay}">
+                <Border Background="#2A2C34" BorderBrush="#4A4C58" BorderThickness="1" Padding="8" MinWidth="200">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button Content="All" Command="{Binding ShowAllTypesCommand}"
+                                    Padding="12,3" Margin="0" />
+                            <Button Content="None" Command="{Binding HideAllTypesCommand}"
+                                    Padding="12,3" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding TypeFilters}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsChecked}" Margin="0,3" Foreground="#E8E8EC">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Display}" />
+                                                <TextBlock Text="{Binding Count, StringFormat=' ({0})'}"
+                                                           Foreground="#9DA0AC" />
+                                            </StackPanel>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+            </Popup>
             <TextBox x:Name="FilterBox" Margin="0,0,8,0" Padding="6,4"
                      Background="#2A2C34" Foreground="#E8E8EC" BorderBrush="#4A4C58"
                      Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
@@ -57,31 +96,77 @@
                       Background="#25262E" Foreground="#E8E8EC" BorderBrush="#4A4C58"
                       KeyDown="FileList_KeyDown"
                       MouseDoubleClick="FileList_MouseDoubleClick"
+                      SizeChanged="FileList_SizeChanged"
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Recycling"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Margin="2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="56" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="48" Height="48" Background="#1B1C22" CornerRadius="4">
-                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="2" />
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="10,0,10,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Extension}" FontSize="11" Foreground="#9DA0AC" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                <TextBlock Text="{Binding SizeDisplay}" FontSize="12" HorizontalAlignment="Right" />
-                                <TextBlock Text="{Binding ModifiedDisplay}" FontSize="11" Foreground="#9DA0AC" />
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
+                <ListView.View>
+                    <GridView>
+                        <!-- Thumbnail (not sortable) -->
+                        <GridViewColumn x:Name="IconColumn" Width="44">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Width="32" Height="32" Background="#1B1C22" CornerRadius="4">
+                                        <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="2" />
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <GridViewColumn x:Name="NameColumn" Width="360">
+                            <GridViewColumn.Header>
+                                <GridViewColumnHeader x:Name="HdrName" Content="Name" Tag="Name"
+                                                      Click="ColumnHeader_Click" />
+                            </GridViewColumn.Header>
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" FontSize="14"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <GridViewColumn x:Name="DateColumn" Width="140">
+                            <GridViewColumn.Header>
+                                <GridViewColumnHeader x:Name="HdrDate" Content="Date modified" Tag="Date"
+                                                      Click="ColumnHeader_Click" />
+                            </GridViewColumn.Header>
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ModifiedDisplay}" FontSize="12"
+                                               Foreground="#C7C9D1" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <GridViewColumn x:Name="TypeColumn" Width="80">
+                            <GridViewColumn.Header>
+                                <GridViewColumnHeader x:Name="HdrType" Content="Type" Tag="Type"
+                                                      Click="ColumnHeader_Click" />
+                            </GridViewColumn.Header>
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding TypeDisplay}" FontSize="12"
+                                               Foreground="#C7C9D1" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <GridViewColumn x:Name="SizeColumn" Width="90">
+                            <GridViewColumn.Header>
+                                <GridViewColumnHeader x:Name="HdrSize" Content="Size" Tag="Size"
+                                                      Click="ColumnHeader_Click"
+                                                      HorizontalContentAlignment="Right" />
+                            </GridViewColumn.Header>
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding SizeDisplay}" FontSize="12"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
             </ListView>
 
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"

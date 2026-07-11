@@ -43,6 +43,9 @@ public partial class FileEntry : ObservableObject
 
     public string ModifiedDisplay => Modified.ToString("yyyy-MM-dd HH:mm");
 
+    /// <summary>Type shown in the Type column and used as the file-type filter key label.</summary>
+    public string TypeDisplay => IsDirectory ? "Folder" : Extension.Length == 0 ? "—" : Extension;
+
     public static string FormatSize(long bytes)
     {
         string[] units = ["B", "KB", "MB", "GB", "TB"];
