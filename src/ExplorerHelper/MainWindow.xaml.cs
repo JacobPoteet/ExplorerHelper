@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Wpf;
 using ExplorerHelper.Models;
 using ExplorerHelper.Services;
@@ -75,15 +76,27 @@ public partial class MainWindow : Window
             return;
 
         var index = FileList.SelectedIndex;
-        ClearPreview();
-        _vm.Delete(selected);
 
-        // Keep the keyboard triage flow going: select the next item.
-        if (FileList.Items.Count > 0)
+        // Release preview handles first. The media engine in particular keeps the
+        // video file open, and it releases the OS handle only once its teardown has
+        // been pumped through the dispatcher.
+        ClearPreview();
+
+        // Defer the actual delete to the next message pump (Background priority) so
+        // that teardown finishes and the handle is freed before SHFileOperation runs.
+        // Deleting synchronously here would block the shell on our own open handle and
+        // freeze the UI for seconds (issue #1).
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
         {
-            FileList.SelectedIndex = Math.Min(index, FileList.Items.Count - 1);
-            FileList.Focus();
-        }
+            _vm.Delete(selected);
+
+            // Keep the keyboard triage flow going: select the next item.
+            if (FileList.Items.Count > 0)
+            {
+                FileList.SelectedIndex = Math.Min(index, FileList.Items.Count - 1);
+                FileList.Focus();
+            }
+        }));
     }
 
     private void RenameSelected()
@@ -180,6 +193,7 @@ public partial class MainWindow : Window
         PreviewImage.Visibility = Visibility.Collapsed;
         PreviewImage.Source = null;
         PreviewMedia.Stop();
+        PreviewMedia.Close(); // releases the media session and the underlying file handle
         PreviewMedia.Source = null;
         PreviewMedia.Visibility = Visibility.Collapsed;
         PreviewWeb.Visibility = Visibility.Collapsed;
