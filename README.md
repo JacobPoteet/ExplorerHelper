@@ -14,12 +14,12 @@ and triage its contents with previews and keyboard shortcuts.
 - **Previews** — images render natively, videos/audio play inline, PDFs render via the built-in Edge WebView2 viewer, and everything else shows the same thumbnail Explorer would
 - **Shell thumbnails** in the file list for every file type Windows knows how to thumbnail
 - **Keyboard triage** — `Del` sends to the Recycle Bin (never permanent deletion), `F2` renames, `Enter` opens
+- **Quick rename** — review files one by one and name them fast: type a name, press `Enter` to rename and jump to the next file. Collisions auto-number (`Clip`, `Clip 2`, `Clip 3`…), the extension is preserved, and a session name palette re-applies recent names in a click — built for triaging a folder of clips or screenshots
 - **Filter & sort** by name, size, date, or type — folders always listed first
 - Multi-select delete, open in Explorer, one-click context-menu install/uninstall from inside the app
 
 ### Roadmap
 
-- Bulk rename with pattern/regex and live preview
 - Duplicate finder (size prefilter + hash)
 - Sort into subfolders by extension/date rules
 - Empty-folder sweep and folder size breakdown

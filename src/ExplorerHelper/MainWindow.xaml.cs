@@ -27,7 +27,10 @@ public partial class MainWindow : Window
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.SelectedFile))
+            {
                 ShowPreview(_vm.SelectedFile);
+                UpdateRenameBar(_vm.SelectedFile);
+            }
         };
 
         // WebView2 must not write its cache next to the exe (read-only when installed).
@@ -97,6 +100,110 @@ public partial class MainWindow : Window
                 FileList.Focus();
             }
         }));
+    }
+
+    // --- Quick rename (review-and-name flow) -----------------------------------------
+
+    /// <summary>
+    /// Reflects the selected file in the rename bar: enables it and shows the extension that
+    /// will be preserved. The staged name is intentionally left untouched so it stays sticky
+    /// across files — a run of similar clips is just Enter, Enter, Enter.
+    /// </summary>
+    private void UpdateRenameBar(FileEntry? entry)
+    {
+        if (entry is null)
+        {
+            QuickRenamePanel.IsEnabled = false;
+            RenameExtLabel.Text = string.Empty;
+            return;
+        }
+
+        QuickRenamePanel.IsEnabled = true;
+        RenameExtLabel.Text = entry.IsDirectory
+            ? "(folder)"
+            : Path.GetExtension(entry.FullPath) is { Length: > 0 } ext ? ext : "(no extension)";
+    }
+
+    private void RenameBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter:
+                ApplyQuickRename();
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                FileList.Focus(); // back to the list for Del / arrow-key triage
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void PaletteChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Content: string name })
+        {
+            // Stage the name; the user still presses Enter to apply (no accidental renames).
+            RenameBox.Text = name;
+            RenameBox.Focus();
+            RenameBox.CaretIndex = name.Length;
+        }
+    }
+
+    private void ApplyQuickRename()
+    {
+        if (_vm.SelectedFile is not { } entry)
+            return;
+        var stem = RenameBox.Text;
+        if (string.IsNullOrWhiteSpace(stem))
+            return;
+
+        // Release preview handles first. A previewing video keeps the file open, so File.Move
+        // would fail until the media engine's teardown has been pumped through the dispatcher —
+        // the same handle problem the delete path solves (issue #1). Defer the rename to the
+        // next Background pump so the handle is freed before we move the file.
+        ClearPreview();
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            var error = _vm.QuickRename(entry, stem);
+            if (error is not null)
+            {
+                MessageBox.Show(this, error, "Rename failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowPreview(_vm.SelectedFile); // restore the preview we cleared
+                RenameBox.Focus();
+                return;
+            }
+
+            // Advance to the next file for the review flow. If we were already on the last one,
+            // the selection doesn't change, so re-show its (now cleared) preview ourselves.
+            if (!AdvanceSelection())
+                ShowPreview(_vm.SelectedFile);
+
+            // Keep focus in the box so a run of similar clips stays keyboard-only.
+            RenameBox.SelectAll();
+            RenameBox.Focus();
+        }));
+    }
+
+    /// <summary>
+    /// Selects the next item without stealing focus from the rename box. Returns false when the
+    /// selection didn't move (empty list or already on the last item).
+    /// </summary>
+    private bool AdvanceSelection()
+    {
+        var index = FileList.SelectedIndex;
+        if (index < 0 || FileList.Items.Count == 0)
+            return false;
+
+        var next = Math.Min(index + 1, FileList.Items.Count - 1);
+        if (next == index)
+            return false;
+
+        FileList.SelectedIndex = next;
+        if (FileList.SelectedItem is not null)
+            FileList.ScrollIntoView(FileList.SelectedItem);
+        return true;
     }
 
     private void RenameSelected()

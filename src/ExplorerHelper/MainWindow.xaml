@@ -87,25 +87,64 @@
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           Background="Transparent" />
 
-            <!-- Preview pane -->
-            <Border Grid.Column="2" Background="#25262E" BorderBrush="#4A4C58" BorderThickness="1" CornerRadius="4">
-                <Grid>
-                    <TextBlock x:Name="PreviewPlaceholder" Text="Select a file to preview it"
-                               Foreground="#9DA0AC" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <Image x:Name="PreviewImage" Stretch="Uniform" Margin="8" Visibility="Collapsed" />
-                    <MediaElement x:Name="PreviewMedia" LoadedBehavior="Manual" Stretch="Uniform" Margin="8"
-                                  Visibility="Collapsed" MediaEnded="PreviewMedia_MediaEnded" />
-                    <wv2:WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
-                    <StackPanel x:Name="PreviewInfo" Visibility="Collapsed"
-                                HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Image x:Name="PreviewInfoThumb" Width="128" Height="128" Stretch="Uniform" />
-                        <TextBlock x:Name="PreviewInfoName" FontSize="15" Margin="0,12,0,2"
-                                   HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" />
-                        <TextBlock x:Name="PreviewInfoDetail" FontSize="12" Foreground="#9DA0AC"
-                                   HorizontalAlignment="Center" />
+            <!-- Preview pane + quick-rename bar -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="#25262E" BorderBrush="#4A4C58" BorderThickness="1" CornerRadius="4">
+                    <Grid>
+                        <TextBlock x:Name="PreviewPlaceholder" Text="Select a file to preview it"
+                                   Foreground="#9DA0AC" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Image x:Name="PreviewImage" Stretch="Uniform" Margin="8" Visibility="Collapsed" />
+                        <MediaElement x:Name="PreviewMedia" LoadedBehavior="Manual" Stretch="Uniform" Margin="8"
+                                      Visibility="Collapsed" MediaEnded="PreviewMedia_MediaEnded" />
+                        <wv2:WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
+                        <StackPanel x:Name="PreviewInfo" Visibility="Collapsed"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Image x:Name="PreviewInfoThumb" Width="128" Height="128" Stretch="Uniform" />
+                            <TextBlock x:Name="PreviewInfoName" FontSize="15" Margin="0,12,0,2"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                            <TextBlock x:Name="PreviewInfoDetail" FontSize="12" Foreground="#9DA0AC"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Quick rename: type a name, Enter renames + advances to the next file -->
+                <Border x:Name="QuickRenamePanel" Grid.Row="1" Margin="0,8,0,0" Padding="10"
+                        Background="#25262E" BorderBrush="#4A4C58" BorderThickness="1" CornerRadius="4"
+                        IsEnabled="False">
+                    <StackPanel>
+                        <TextBlock Text="Quick rename" FontSize="11" Foreground="#9DA0AC" Margin="0,0,0,5" />
+                        <DockPanel LastChildFill="True">
+                            <TextBlock x:Name="RenameExtLabel" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                       Foreground="#9DA0AC" FontSize="13" Margin="6,0,0,0" />
+                            <TextBox x:Name="RenameBox" Padding="6,4" FontSize="14"
+                                     Background="#2A2C34" Foreground="#E8E8EC" BorderBrush="#4A4C58"
+                                     KeyDown="RenameBox_KeyDown"
+                                     ToolTip="Type a name and press Enter — collisions auto-number (Clip, Clip 2, …). Esc returns to the list." />
+                        </DockPanel>
+                        <ItemsControl x:Name="Palette" ItemsSource="{Binding RecentNames}" Margin="0,7,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding}" Click="PaletteChip_Click"
+                                            Margin="0,0,5,5" Padding="9,3"
+                                            Background="#33353F" Foreground="#E8E8EC" BorderBrush="#4A4C58"
+                                            ToolTip="Stage this name — press Enter to apply" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
-                </Grid>
-            </Border>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- Status bar -->

@@ -6,7 +6,7 @@ namespace ExplorerHelper.Models;
 
 public partial class FileEntry : ObservableObject
 {
-    public string FullPath { get; }
+    public string FullPath { get; private set; }
     public bool IsDirectory { get; }
     public string Extension { get; }
     public long SizeBytes { get; }
@@ -26,6 +26,17 @@ public partial class FileEntry : ObservableObject
         Extension = IsDirectory ? "Folder" : info.Extension.TrimStart('.').ToUpperInvariant();
         SizeBytes = info is FileInfo file ? file.Length : 0;
         Modified = info.LastWriteTime;
+    }
+
+    /// <summary>
+    /// Reflects a rename that already happened on disk, keeping the entry in place in the
+    /// list (no re-sort) so a review-and-rename pass doesn't shuffle items around.
+    /// The thumbnail and size are unchanged — only the location changes.
+    /// </summary>
+    public void UpdatePath(string newFullPath)
+    {
+        FullPath = newFullPath;
+        Name = Path.GetFileName(newFullPath);
     }
 
     public string SizeDisplay => IsDirectory ? string.Empty : FormatSize(SizeBytes);
