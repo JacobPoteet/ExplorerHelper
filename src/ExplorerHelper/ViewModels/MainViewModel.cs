@@ -17,6 +17,12 @@ public partial class MainViewModel : ObservableObject
 
     private const int MaxRecentNames = 12;
 
+    /// <summary>The distinct file types present in the folder, each toggleable on/off (issue #5).</summary>
+    public ObservableCollection<TypeFilter> TypeFilters { get; } = [];
+
+    // Set while toggling many type filters at once so ApplyView runs once, not per item.
+    private bool _suspendApplyView;
+
     [ObservableProperty]
     private string _folderPath = string.Empty;
 
@@ -76,6 +82,7 @@ public partial class MainViewModel : ObservableObject
             .Select(info => new FileEntry(info))
             .ToList();
 
+        BuildTypeFilters();
         ApplyView();
         LoadThumbnailsInBackground();
     }
@@ -240,12 +247,59 @@ public partial class MainViewModel : ObservableObject
             RecentNames.RemoveAt(RecentNames.Count - 1);
     }
 
+    /// <summary>Rebuilds the type-filter list from the folder's entries — all types start shown.</summary>
+    private void BuildTypeFilters()
+    {
+        foreach (var filter in TypeFilters)
+            filter.PropertyChanged -= TypeFilterChanged;
+        TypeFilters.Clear();
+
+        var groups = _allEntries
+            .GroupBy(e => e.Extension)
+            .OrderBy(g => g.Key == "Folder" ? 0 : 1) // folders first, then extensions A→Z
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groups)
+        {
+            var filter = new TypeFilter(group.Key, group.Count());
+            filter.PropertyChanged += TypeFilterChanged;
+            TypeFilters.Add(filter);
+        }
+    }
+
+    private void TypeFilterChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TypeFilter.IsChecked) && !_suspendApplyView)
+            ApplyView();
+    }
+
+    [RelayCommand]
+    private void ShowAllTypes() => SetAllTypes(true);
+
+    [RelayCommand]
+    private void HideAllTypes() => SetAllTypes(false);
+
+    private void SetAllTypes(bool isChecked)
+    {
+        // Toggle everything, then refresh the view a single time.
+        _suspendApplyView = true;
+        foreach (var filter in TypeFilters)
+            filter.IsChecked = isChecked;
+        _suspendApplyView = false;
+        ApplyView();
+    }
+
     private void ApplyView()
     {
         IEnumerable<FileEntry> view = _allEntries;
 
         if (!string.IsNullOrWhiteSpace(FilterText))
             view = view.Where(f => f.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase));
+
+        // Type filter: keep only entries whose type is currently checked.
+        var hidden = TypeFilters.Where(t => !t.IsChecked).Select(t => t.Key).ToHashSet();
+        if (hidden.Count > 0)
+            view = view.Where(f => !hidden.Contains(f.Extension));
 
         // Folders always first, then the active column in the chosen direction.
         var ordered = view.OrderBy(f => !f.IsDirectory ? 1 : 0);

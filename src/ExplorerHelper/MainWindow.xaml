@@ -42,6 +42,39 @@
                     Command="{Binding ToggleContextMenuCommand}" />
             <Button DockPanel.Dock="Right" Content="Open in Explorer" Command="{Binding OpenInExplorerCommand}" />
             <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" />
+            <ToggleButton x:Name="TypesButton" DockPanel.Dock="Right" Content="Types ▾"
+                          Padding="10,5" Margin="4,0,0,0"
+                          Background="#33353F" Foreground="#E8E8EC" BorderBrush="#4A4C58"
+                          ToolTip="Show or hide files by type" />
+            <Popup PlacementTarget="{Binding ElementName=TypesButton}" Placement="Bottom"
+                   StaysOpen="False" AllowsTransparency="True"
+                   IsOpen="{Binding IsChecked, ElementName=TypesButton, Mode=TwoWay}">
+                <Border Background="#2A2C34" BorderBrush="#4A4C58" BorderThickness="1" Padding="8" MinWidth="200">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button Content="All" Command="{Binding ShowAllTypesCommand}"
+                                    Padding="12,3" Margin="0" />
+                            <Button Content="None" Command="{Binding HideAllTypesCommand}"
+                                    Padding="12,3" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding TypeFilters}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsChecked}" Margin="0,3" Foreground="#E8E8EC">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Display}" />
+                                                <TextBlock Text="{Binding Count, StringFormat=' ({0})'}"
+                                                           Foreground="#9DA0AC" />
+                                            </StackPanel>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+            </Popup>
             <TextBox x:Name="FilterBox" Margin="0,0,8,0" Padding="6,4"
                      Background="#2A2C34" Foreground="#E8E8EC" BorderBrush="#4A4C58"
                      Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
