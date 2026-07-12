@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExplorerHelper", "src\ExplorerHelper\ExplorerHelper.csproj", "{10755055-B922-49FA-A6D6-1BAA89E01719}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExplorerHelper.ShellExtension", "src\ExplorerHelper.ShellExtension\ExplorerHelper.ShellExtension.csproj", "{384E4F86-18F0-4617-BCFF-6337FC9742B1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,11 +31,24 @@ Global
 		{10755055-B922-49FA-A6D6-1BAA89E01719}.Release|x64.Build.0 = Release|Any CPU
 		{10755055-B922-49FA-A6D6-1BAA89E01719}.Release|x86.ActiveCfg = Release|Any CPU
 		{10755055-B922-49FA-A6D6-1BAA89E01719}.Release|x86.Build.0 = Release|Any CPU
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Debug|Any CPU.Build.0 = Debug|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Debug|x64.ActiveCfg = Debug|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Debug|x64.Build.0 = Debug|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Debug|x86.ActiveCfg = Debug|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Debug|x86.Build.0 = Debug|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Release|Any CPU.ActiveCfg = Release|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Release|Any CPU.Build.0 = Release|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Release|x64.ActiveCfg = Release|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Release|x64.Build.0 = Release|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Release|x86.ActiveCfg = Release|x64
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{10755055-B922-49FA-A6D6-1BAA89E01719} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{384E4F86-18F0-4617-BCFF-6337FC9742B1} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

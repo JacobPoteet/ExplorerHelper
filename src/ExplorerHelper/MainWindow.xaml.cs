@@ -99,6 +99,11 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                 _vm.OpenSelectedCommand.Execute(null);
                 e.Handled = true;
                 break;
+            case Key.Z when (Keyboard.Modifiers & ModifierKeys.Control) != 0:
+                if (_vm.UndoCommand.CanExecute(null))
+                    _vm.UndoCommand.Execute(null);
+                e.Handled = true;
+                break;
         }
     }
 
@@ -283,7 +288,16 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             if (!entry.IsDirectory && (VideoExtensions.Contains(ext) || AudioExtensions.Contains(ext)))
             {
                 PreviewMedia.Source = new Uri(entry.FullPath);
+                // Keep the media element live so playback runs; for audio it renders no picture,
+                // so overlay a speaker on top (it sits later in the Grid, so it wins z-order) to
+                // make clear a file is selected and playing (issue #8).
                 PreviewMedia.Visibility = Visibility.Visible;
+                if (AudioExtensions.Contains(ext))
+                {
+                    PreviewAudioName.Text = entry.Name;
+                    PreviewAudioDetail.Text = $"{entry.Extension} · {entry.SizeDisplay} · playing";
+                    PreviewAudio.Visibility = Visibility.Visible;
+                }
                 PreviewMedia.Play();
                 return;
             }
@@ -338,6 +352,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         PreviewMedia.Close(); // releases the media session and the underlying file handle
         PreviewMedia.Source = null;
         PreviewMedia.Visibility = Visibility.Collapsed;
+        PreviewAudio.Visibility = Visibility.Collapsed;
         PreviewWeb.Visibility = Visibility.Collapsed;
         if (_webViewReady)
             PreviewWeb.CoreWebView2.Navigate("about:blank"); // release the file handle
