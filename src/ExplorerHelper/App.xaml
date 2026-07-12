@@ -10,6 +10,7 @@
                 <ui:ControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

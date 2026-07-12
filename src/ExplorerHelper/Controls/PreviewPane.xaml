@@ -8,7 +8,8 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center" />
         <Image x:Name="PreviewImage" Stretch="Uniform" Margin="8" Visibility="Collapsed" />
         <MediaElement x:Name="PreviewMedia" LoadedBehavior="Manual" Stretch="Uniform" Margin="8"
-                      Visibility="Collapsed" MediaEnded="PreviewMedia_MediaEnded" />
+                      Visibility="Collapsed" ScrubbingEnabled="True"
+                      MediaOpened="PreviewMedia_MediaOpened" MediaEnded="PreviewMedia_MediaEnded" />
         <wv2:WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
         <!-- Audio-only files have no video frame, so the media element renders
              nothing. Show a speaker so it's clear a file is selected and playing
@@ -43,5 +44,36 @@
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        HorizontalAlignment="Center" />
         </StackPanel>
+
+        <!-- Video scrubbing timeline (issue #19): play/pause, elapsed/total time, and a draggable
+             slider to jump anywhere in the clip. Overlays the bottom of the video; shown only while
+             a video is previewing. -->
+        <Border x:Name="VideoControls" Visibility="Collapsed"
+                VerticalAlignment="Bottom" Margin="12" Padding="10,6"
+                Background="#C0202020" CornerRadius="8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="PlayPauseButton" Grid.Column="0" Content="⏸"
+                        Width="30" Height="30" FontSize="13" Padding="0"
+                        Background="Transparent" BorderThickness="0" Foreground="White"
+                        Cursor="Hand" Click="PlayPauseButton_Click"
+                        ToolTip="Play / pause" />
+                <TextBlock x:Name="PositionText" Grid.Column="1" Text="0:00"
+                           Foreground="White" FontSize="12" VerticalAlignment="Center"
+                           Margin="6,0,8,0" />
+                <Slider x:Name="TimelineSlider" Grid.Column="2" VerticalAlignment="Center"
+                        Minimum="0" Maximum="1" SmallChange="1" LargeChange="5"
+                        IsMoveToPointEnabled="True"
+                        ValueChanged="TimelineSlider_ValueChanged" />
+                <TextBlock x:Name="DurationText" Grid.Column="3" Text="0:00"
+                           Foreground="White" FontSize="12" VerticalAlignment="Center"
+                           Margin="8,0,0,0" />
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

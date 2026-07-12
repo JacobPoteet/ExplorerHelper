@@ -11,7 +11,8 @@ and triage its contents with previews and keyboard shortcuts.
 ## Features
 
 - **Explorer context menu** — "Clean this folder" on folders and folder backgrounds (per-user, no admin required)
-- **Previews** — images render natively, videos play inline, audio shows a speaker so you know a file is selected and playing, PDFs render via the built-in Edge WebView2 viewer, and everything else shows the same thumbnail Explorer would
+- **Previews** — images render natively, videos play inline (with a **scrub timeline**: play/pause, elapsed/total time, and a draggable slider to jump anywhere in the clip), audio shows a speaker so you know a file is selected and playing, PDFs render via the built-in Edge WebView2 viewer, and everything else shows the same thumbnail Explorer would
+- **Preview details** — a strip under the preview shows the selected file's metadata (type, size, resolution, length, frame rate, bit rate, created/modified dates). Each detail type is toggleable in **Settings**, and media-only rows appear only for files that have them
 - **Shell thumbnails** in the file list for every file type Windows knows how to thumbnail
 - **Triage mode** — review files one at a time like a dating app: swipe (or `←`/`→`) to reject or keep,
   `↓` skips, `Backspace` rewinds. Nothing touches the disk while you swipe — a review screen shows both

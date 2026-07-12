@@ -33,6 +33,9 @@ public partial class TriageView : UserControl
     public TriageView()
     {
         InitializeComponent();
+
+        // Swiping the card owns the mouse here, so a scrub slider can't coexist (issue #19).
+        CardPreview.EnableVideoTimeline = false;
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using ExplorerHelper.Models;
 
 namespace ExplorerHelper.Services;
 
@@ -19,6 +20,13 @@ public sealed class AppSettings
 
     /// <summary>.NET custom date/time format for the file's created-date dynamic button.</summary>
     public string CreatedDateFormat { get; set; } = "yyyy-MM-dd";
+
+    /// <summary>
+    /// Which preview detail rows are shown under the preview (issue #20). Stored as the detail
+    /// keys from <see cref="PreviewDetailKinds"/>; a null value means "never configured" and
+    /// falls back to <see cref="PreviewDetailKinds.DefaultEnabled"/>.
+    /// </summary>
+    public List<string>? EnabledPreviewDetails { get; set; }
 
     private static string SettingsPath
     {
@@ -77,6 +85,7 @@ public sealed class AppSettings
             TodayDateFormat = "yyyy-MM-dd";
         if (string.IsNullOrWhiteSpace(CreatedDateFormat))
             CreatedDateFormat = "yyyy-MM-dd";
+        EnabledPreviewDetails ??= [.. PreviewDetailKinds.DefaultEnabled];
         return this;
     }
 }
