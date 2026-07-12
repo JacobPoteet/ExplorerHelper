@@ -20,10 +20,17 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         DataContext = _vm;
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.SelectedFile))
+            switch (e.PropertyName)
             {
-                Preview.Show(_vm.SelectedFile);
-                UpdateRenameBar(_vm.SelectedFile);
+                case nameof(MainViewModel.SelectedFile):
+                    Preview.Show(_vm.SelectedFile);
+                    UpdateRenameBar(_vm.SelectedFile);
+                    break;
+                case nameof(MainViewModel.TodayDateFormat):
+                case nameof(MainViewModel.CreatedDateFormat):
+                    // Live-update the date button labels as the user edits formats in Settings.
+                    RefreshDynamicButtons(_vm.SelectedFile);
+                    break;
             }
         };
 
@@ -35,6 +42,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         };
 
         UpdateSortIndicators();
+        RefreshDynamicButtons(null); // seed the "today" button label before any file is selected
     }
 
     public void LoadFolder(string path)
@@ -186,6 +194,86 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         RenameExtLabel.Text = entry.IsDirectory
             ? "(folder)"
             : Path.GetExtension(entry.FullPath) is { Length: > 0 } ext ? ext : "(no extension)";
+        RefreshDynamicButtons(entry);
+    }
+
+    // --- Quick-use buttons (issue #14) -----------------------------------------------
+
+    /// <summary>
+    /// Refreshes the two dynamic date buttons' labels: "today" tracks the current date, "created"
+    /// shows the selected file's creation date. Both use the formats configured in Settings and
+    /// fall back gracefully on a bad format string (never throws from a typo).
+    /// </summary>
+    private void RefreshDynamicButtons(FileEntry? entry)
+    {
+        TodayButton.Content = MainViewModel.FormatDate(DateTime.Now, _vm.TodayDateFormat);
+        CreatedButton.Content = entry is null
+            ? string.Empty
+            : MainViewModel.FormatDate(entry.Created, _vm.CreatedDateFormat);
+    }
+
+    private void TodayButton_Click(object sender, RoutedEventArgs e) =>
+        AppendToRenameBox(MainViewModel.FormatDate(DateTime.Now, _vm.TodayDateFormat));
+
+    private void CreatedButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.SelectedFile is { } entry)
+            AppendToRenameBox(MainViewModel.FormatDate(entry.Created, _vm.CreatedDateFormat));
+    }
+
+    private void QuickButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Content: string text })
+            AppendToRenameBox(text);
+    }
+
+    /// <summary>
+    /// Drops preset/date text into the rename box, building the name up piece by piece: appends
+    /// with a single space when the box already has content, otherwise seeds it. Keeps focus and
+    /// the caret at the end so the user can keep typing or tap another button.
+    /// </summary>
+    private void AppendToRenameBox(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return;
+        var current = RenameBox.Text;
+        RenameBox.Text = string.IsNullOrWhiteSpace(current)
+            ? text
+            : current.TrimEnd() + " " + text;
+        RenameBox.Focus();
+        RenameBox.CaretIndex = RenameBox.Text.Length;
+    }
+
+    private void AddQuickButton_Click(object sender, RoutedEventArgs e) => CommitNewButton();
+
+    private void NewButtonBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            CommitNewButton();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            AddButtonToggle.IsChecked = false;
+            e.Handled = true;
+        }
+    }
+
+    private void CommitNewButton()
+    {
+        var text = NewButtonBox.Text;
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+        _vm.AddQuickButton(text);
+        NewButtonBox.Text = string.Empty;
+        AddButtonToggle.IsChecked = false;
+    }
+
+    private void RemoveQuickButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string text })
+            _vm.RemoveQuickButton(text);
     }
 
     private void RenameBox_KeyDown(object sender, KeyEventArgs e)
