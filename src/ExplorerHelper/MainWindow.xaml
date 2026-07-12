@@ -109,6 +109,8 @@
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,6,0,0"
                         MaxWidth="320">
+                    <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
                         <TextBlock Text="Explorer integration" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -177,7 +179,27 @@
                         <TextBlock Text="{Binding CreatedFormatPreview, StringFormat=Preview: {0}}"
                                    FontSize="11"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+
+                        <Separator Margin="0,12" />
+
+                        <!-- Preview details (issue #20): pick which detail rows show under the
+                             preview. Media-specific rows only appear when the file has that data. -->
+                        <TextBlock Text="Preview details" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,6"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Shown under the preview. Resolution, length, frame rate and bit rate only appear for files that have them." />
+                        <ItemsControl ItemsSource="{Binding PreviewDetailToggles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked}"
+                                              Margin="0,2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
+                    </ScrollViewer>
                 </Border>
             </Popup>
             <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
@@ -360,6 +382,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
@@ -368,8 +391,35 @@
                     <controls:PreviewPane x:Name="Preview" />
                 </Border>
 
+                <!-- File details (issue #20): the enabled detail rows for the selected file.
+                     Hidden when there's nothing to show; which rows appear is set in Settings. -->
+                <Border Grid.Row="1" Margin="0,10,0,0" Padding="12,8"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="8"
+                        Visibility="{Binding HasItems, ElementName=DetailsItems,
+                                     Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl x:Name="DetailsItems" ItemsSource="{Binding PreviewDetails}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,18,2">
+                                    <TextBlock Text="{Binding Label}" FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                    <TextBlock Text="{Binding Value}" FontSize="12" Margin="6,0,0,0"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
                 <!-- Quick rename: type a name, Enter renames + advances to the next file -->
-                <Border x:Name="QuickRenamePanel" Grid.Row="1" Margin="0,10,0,0" Padding="12"
+                <Border x:Name="QuickRenamePanel" Grid.Row="2" Margin="0,10,0,0" Padding="12"
                         Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8"

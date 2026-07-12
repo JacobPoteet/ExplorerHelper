@@ -26,6 +26,21 @@ public partial class MainViewModel : ObservableObject
     /// <summary>User-defined preset strings shown as one-click buttons under the rename box.</summary>
     public ObservableCollection<string> QuickNameButtons { get; } = [];
 
+    // --- Preview details (issue #20) --------------------------------------------------
+    // The Settings toggles pick which detail rows appear under the preview; PreviewDetails is
+    // the derived list the panel binds to, rebuilt whenever the selection, its metadata, or the
+    // toggles change. Media metadata (resolution/length/frame rate/bit rate) is read off the
+    // Windows shell on a background thread and merged in when it arrives.
+
+    /// <summary>Per-detail on/off switches shown in Settings, in display order.</summary>
+    public ObservableCollection<PreviewDetailToggle> PreviewDetailToggles { get; } = [];
+
+    /// <summary>The label/value rows shown under the preview for the current selection.</summary>
+    public ObservableCollection<PreviewDetailRow> PreviewDetails { get; } = [];
+
+    private ShellPropertyService.MediaProperties? _currentMedia;
+    private CancellationTokenSource? _detailsCts;
+
     /// <summary>.NET custom date format for the "today's date" dynamic button.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TodayFormatPreview))]
@@ -49,7 +64,101 @@ public partial class MainViewModel : ObservableObject
             QuickNameButtons.Add(name);
         TodayDateFormat = _settings.TodayDateFormat;
         CreatedDateFormat = _settings.CreatedDateFormat;
+
+        // Null (never configured) → defaults; an explicit empty list means the user hid them all.
+        var enabledDetails = _settings.EnabledPreviewDetails is { } saved
+            ? new HashSet<string>(saved, StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(PreviewDetailKinds.DefaultEnabled, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, label) in PreviewDetailKinds.All)
+        {
+            var toggle = new PreviewDetailToggle(key, label, enabledDetails.Contains(key));
+            toggle.PropertyChanged += OnPreviewDetailToggleChanged;
+            PreviewDetailToggles.Add(toggle);
+        }
     }
+
+    partial void OnSelectedFileChanged(FileEntry? value)
+    {
+        // New selection: drop stale media metadata, show what we know instantly, fetch the rest.
+        _currentMedia = null;
+        RebuildPreviewDetails();
+        LoadMediaPropertiesInBackground(value);
+    }
+
+    private void OnPreviewDetailToggleChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(PreviewDetailToggle.IsChecked))
+            return;
+        _settings.EnabledPreviewDetails = PreviewDetailToggles.Where(t => t.IsChecked).Select(t => t.Key).ToList();
+        _settings.Save();
+        RebuildPreviewDetails();
+    }
+
+    /// <summary>Rebuilds the visible detail rows from the current selection, its cached media
+    /// metadata, and the enabled toggles — skipping any detail with no value for this file.</summary>
+    private void RebuildPreviewDetails()
+    {
+        PreviewDetails.Clear();
+        if (SelectedFile is not { } entry)
+            return;
+        foreach (var toggle in PreviewDetailToggles)
+        {
+            if (!toggle.IsChecked)
+                continue;
+            var value = FormatDetail(toggle.Key, entry, _currentMedia);
+            if (!string.IsNullOrEmpty(value))
+                PreviewDetails.Add(new PreviewDetailRow(toggle.Label, value));
+        }
+    }
+
+    private void LoadMediaPropertiesInBackground(FileEntry? entry)
+    {
+        _detailsCts?.Cancel();
+        if (entry is null || entry.IsDirectory)
+            return;
+
+        var cts = new CancellationTokenSource();
+        _detailsCts = cts;
+        var path = entry.FullPath;
+        var token = cts.Token;
+
+        Task.Run(() =>
+        {
+            var media = ShellPropertyService.Read(path);
+            if (token.IsCancellationRequested)
+                return;
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            dispatcher?.Invoke(() =>
+            {
+                // Ignore late results for a selection the user has already moved off of.
+                if (token.IsCancellationRequested || SelectedFile?.FullPath != path)
+                    return;
+                _currentMedia = media;
+                RebuildPreviewDetails();
+            });
+        }, token);
+    }
+
+    private static string? FormatDetail(string key, FileEntry entry, ShellPropertyService.MediaProperties? media) => key switch
+    {
+        PreviewDetailKinds.Type => entry.TypeDisplay,
+        PreviewDetailKinds.Size => entry.IsDirectory ? null : entry.SizeDisplay,
+        PreviewDetailKinds.Dimensions => media?.Dimensions is { } d ? $"{d.Width} × {d.Height}" : null,
+        PreviewDetailKinds.Duration => media?.Duration is { } t ? FormatDuration(t) : null,
+        PreviewDetailKinds.FrameRate => media?.FrameRate is { } f ? $"{f:0.##} fps" : null,
+        PreviewDetailKinds.Bitrate => media?.Bitrate is { } b ? FormatBitrate(b) : null,
+        PreviewDetailKinds.Created => entry.Created.ToString("yyyy-MM-dd HH:mm"),
+        PreviewDetailKinds.Modified => entry.ModifiedDisplay,
+        _ => null,
+    };
+
+    private static string FormatDuration(TimeSpan t) => t.TotalHours >= 1
+        ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
+        : $"{t.Minutes}:{t.Seconds:00}";
+
+    private static string FormatBitrate(ulong bitsPerSecond) => bitsPerSecond >= 1_000_000
+        ? $"{bitsPerSecond / 1_000_000.0:0.#} Mbps"
+        : $"{bitsPerSecond / 1000.0:0} kbps";
 
     partial void OnTodayDateFormatChanged(string value)
     {
