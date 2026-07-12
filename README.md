@@ -13,8 +13,13 @@ and triage its contents with previews and keyboard shortcuts.
 - **Explorer context menu** — "Clean this folder" on folders and folder backgrounds (per-user, no admin required)
 - **Previews** — images render natively, videos play inline, audio shows a speaker so you know a file is selected and playing, PDFs render via the built-in Edge WebView2 viewer, and everything else shows the same thumbnail Explorer would
 - **Shell thumbnails** in the file list for every file type Windows knows how to thumbnail
+- **Triage mode** — review files one at a time like a dating app: swipe (or `←`/`→`) to reject or keep,
+  `↓` skips, `Backspace` rewinds. Nothing touches the disk while you swipe — a review screen shows both
+  piles (swap or unmark any file), then one **Commit** recycles the rejects and optionally moves the
+  keepers to a folder of your choice (e.g. pull the good shots off an SD card). One `Ctrl`+`Z` reverses
+  the whole commit. `K`/`X`/`U` flag files straight from the list too
 - **Keyboard triage** — `Del` sends to the Recycle Bin (never permanent deletion), `F2` renames, `Enter` opens
-- **Undo** — `Ctrl`+`Z` reverses the last rename or delete; deleted files come straight back out of the Recycle Bin
+- **Undo** — `Ctrl`+`Z` reverses the last rename, delete, or triage commit; deleted files come straight back out of the Recycle Bin
 - **Quick rename** — review files one by one and name them fast: type a name, press `Enter` to rename and jump to the next file. Collisions auto-number (`Clip`, `Clip 2`, `Clip 3`…), the extension is preserved, and a session name palette re-applies recent names in a click — built for triaging a folder of clips or screenshots
 - **Filter & sort** by name, size, date, or type — folders always listed first
 - Multi-select delete, open in Explorer, one-click context-menu install/uninstall from inside the app

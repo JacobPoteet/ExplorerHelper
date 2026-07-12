@@ -1,0 +1,47 @@
+<UserControl x:Class="ExplorerHelper.Controls.PreviewPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+    <Grid>
+        <TextBlock x:Name="PreviewPlaceholder" Text="Select a file to preview it"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <Image x:Name="PreviewImage" Stretch="Uniform" Margin="8" Visibility="Collapsed" />
+        <MediaElement x:Name="PreviewMedia" LoadedBehavior="Manual" Stretch="Uniform" Margin="8"
+                      Visibility="Collapsed" MediaEnded="PreviewMedia_MediaEnded" />
+        <wv2:WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
+        <!-- Audio-only files have no video frame, so the media element renders
+             nothing. Show a speaker so it's clear a file is selected and playing
+             (issue #8). PreviewMedia keeps playing the audio underneath. -->
+        <StackPanel x:Name="PreviewAudio" Visibility="Collapsed"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Viewbox Width="132" Height="132" HorizontalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                    <Path Fill="{DynamicResource AccentFillColorDefaultBrush}"
+                          Data="M3,9 L6,9 L10.5,5 L10.5,19 L6,15 L3,15 Z" />
+                    <Path Stroke="{DynamicResource AccentFillColorDefaultBrush}" StrokeThickness="1.6"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M13.5,8.5 C15.3,10.5 15.3,13.5 13.5,15.5" />
+                    <Path Stroke="{DynamicResource AccentFillColorDefaultBrush}" StrokeThickness="1.6"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M16,6 C19.5,9 19.5,15 16,18" />
+                </Canvas>
+            </Viewbox>
+            <TextBlock x:Name="PreviewAudioName" FontSize="15" Margin="0,14,0,2"
+                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       MaxWidth="320" />
+            <TextBlock x:Name="PreviewAudioDetail" FontSize="12"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+        <StackPanel x:Name="PreviewInfo" Visibility="Collapsed"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Image x:Name="PreviewInfoThumb" Width="128" Height="128" Stretch="Uniform" />
+            <TextBlock x:Name="PreviewInfoName" FontSize="15" Margin="0,12,0,2"
+                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" />
+            <TextBlock x:Name="PreviewInfoDetail" FontSize="12"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</UserControl>
