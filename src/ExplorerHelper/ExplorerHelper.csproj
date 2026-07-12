@@ -11,6 +11,9 @@
     <Description>Clean and organize folders straight from the Explorer context menu.</Description>
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Embeds the icon in the exe's Win32 resource: the Explorer context-menu entry
+         (Icon = the exe path) and the taskbar/alt-tab window icon both resolve to it. -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
