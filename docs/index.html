@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Explorer Helper — clean and organize folders from the right-click menu</title>
-  <meta name="description" content="Clean and organize any Windows folder straight from the Explorer right-click menu. Previews, keyboard triage, quick rename, and one-key undo." />
+  <meta name="description" content="Clean and organize any Windows folder straight from the Explorer right-click menu. Live previews, swipe-to-triage, quick rename with reusable buttons, and one-key undo." />
   <meta property="og:title" content="Explorer Helper" />
-  <meta property="og:description" content="Clean and organize any Windows folder straight from the Explorer right-click menu." />
+  <meta property="og:description" content="Clean and organize any Windows folder straight from the Explorer right-click menu — swipe to triage, rename fast, undo anything." />
   <meta property="og:type" content="website" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧹</text></svg>" />
   <style>
@@ -98,6 +98,8 @@
     .fl-head { background: var(--bg-3); color: var(--muted); font-size: .78rem; border-bottom: 1px solid var(--border); }
     .fl-row { border-bottom: 1px solid rgba(74,76,88,.35); font-size: .86rem; }
     .fl-row.sel { background: rgba(138,180,248,.14); }
+    .name-cell { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
+    .name-cell > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .thumb { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-size: .95rem; }
     .thumb.img { background: linear-gradient(135deg,#6f86d6,#48c6ef); }
     .thumb.vid { background: linear-gradient(135deg,#c94b4b,#4b134f); }
@@ -116,8 +118,15 @@
     .rename .field { display: flex; gap: 6px; margin-top: 6px; }
     .rename input { flex: 1; background: var(--bg-3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 9px; font: inherit; font-size: .85rem; }
     .rename .ext { color: var(--muted); align-self: center; font-size: .82rem; }
-    .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
     .chip { background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: .76rem; }
+    /* Dynamic date buttons are styled apart from static presets. */
+    .chip-date { background: linear-gradient(180deg, rgba(138,180,248,.28), rgba(111,160,246,.18)); border-color: rgba(138,180,248,.55); color: #cfe0ff; }
+    .chip-add { background: transparent; color: var(--muted); font-weight: 700; }
+    /* Triage flags on the file list */
+    .flag { font-weight: 700; font-size: .8rem; }
+    .flag.keep { color: var(--ok); }
+    .flag.reject { color: #ff6b6b; }
 
     /* Sections */
     section { padding: 62px 0; }
@@ -185,8 +194,9 @@
     <div class="wrap hero">
       <h1>Clean up any folder<br /><span class="grad">without leaving Explorer.</span></h1>
       <p class="lead">
-        Right-click a folder, hit <strong>Clean this folder</strong>, and triage its contents with
-        live previews and keyboard shortcuts. Built for taming folders of clips, screenshots, and downloads.
+        Right-click a folder, hit <strong>Clean this folder</strong>, then swipe through its contents
+        with live previews and keyboard shortcuts — keep, reject, rename, and commit in one pass.
+        Built for taming folders of clips, screenshots, and downloads.
       </p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">⬇ Download for Windows</a>
@@ -209,19 +219,19 @@
         <div class="mock-toolbar">
           <span class="pill grow">🔎 Filter files by name…</span>
           <span class="pill">Types ▾</span>
-          <span class="pill">Refresh</span>
+          <span class="pill">🃏 Triage</span>
           <span class="pill">↩ Undo</span>
-          <span class="pill">Open in Explorer</span>
+          <span class="pill">⚙ Settings</span>
         </div>
         <div class="mock-body">
           <div class="filelist">
             <div class="fl-head"><span></span><span>Name ▲</span><span>Date</span><span class="num">Size</span></div>
             <div class="fl-row"><span class="thumb fld">📁</span><span>Keepers</span><span class="muted">2026-07-02</span><span class="num muted">—</span></div>
-            <div class="fl-row"><span class="thumb img">🖼</span><span>screenshot 2026-07-04.png</span><span class="muted">07-04 14:22</span><span class="num">1.2 MB</span></div>
+            <div class="fl-row"><span class="thumb img">🖼</span><span class="name-cell"><span>screenshot 2026-07-04.png</span><span class="flag keep">✓ keep</span></span><span class="muted">07-04 14:22</span><span class="num">1.2 MB</span></div>
             <div class="fl-row sel"><span class="thumb aud">🔊</span><span>voice-memo.m4a</span><span class="muted">07-05 09:10</span><span class="num">4.8 MB</span></div>
-            <div class="fl-row"><span class="thumb vid">🎬</span><span>clip_0421.mp4</span><span class="muted">07-05 18:03</span><span class="num">88 MB</span></div>
+            <div class="fl-row"><span class="thumb vid">🎬</span><span class="name-cell"><span>clip_0421.mp4</span><span class="flag reject">✗ reject</span></span><span class="muted">07-05 18:03</span><span class="num">88 MB</span></div>
             <div class="fl-row"><span class="thumb doc">📄</span><span>notes.pdf</span><span class="muted">07-06 11:47</span><span class="num">320 KB</span></div>
-            <div class="fl-row"><span class="thumb vid">🎬</span><span>clip_0422.mp4</span><span class="muted">07-06 20:15</span><span class="num">102 MB</span></div>
+            <div class="fl-row"><span class="thumb vid">🎬</span><span class="name-cell"><span>clip_0422.mp4</span><span class="flag reject">✗ reject</span></span><span class="muted">07-06 20:15</span><span class="num">102 MB</span></div>
           </div>
           <div class="preview">
             <div class="preview-stage">
@@ -238,13 +248,16 @@
             <div class="rename">
               <label>QUICK RENAME</label>
               <div class="field">
-                <input value="Interview" readonly />
+                <input value="Interview 2026-07-05" readonly />
                 <span class="ext">.m4a</span>
               </div>
               <div class="chips">
+                <span class="chip chip-date">📅 today</span>
+                <span class="chip chip-date">🕒 created</span>
                 <span class="chip">Interview</span>
                 <span class="chip">B-roll</span>
                 <span class="chip">Keeper</span>
+                <span class="chip chip-add">+</span>
               </div>
             </div>
           </div>
@@ -261,11 +274,13 @@
         <p class="sub">Previews, filters, and keyboard-first flows — none of it leaves your machine.</p>
         <div class="grid">
           <div class="card"><div class="ic">🖱️</div><h3>Explorer context menu</h3><p>“Clean this folder” on folders and folder backgrounds. Per-user, no admin required.</p></div>
+          <div class="card"><div class="ic">🃏</div><h3>Swipe-to-triage</h3><p>Review files one at a time like a dating app — swipe or <kbd>←</kbd>/<kbd>→</kbd> to reject or keep. Nothing touches the disk until you <strong>Commit</strong>: rejects go to the Recycle Bin, keepers can move to a folder of your choice.</p></div>
           <div class="card"><div class="ic">👁️</div><h3>Live previews</h3><p>Images render natively, video and audio play inline, and PDFs open in the built-in viewer.</p></div>
           <div class="card"><div class="ic">🔊</div><h3>Audio, clearly</h3><p>Audio-only files show a speaker so you always know which file is selected and playing.</p></div>
-          <div class="card"><div class="ic">⌨️</div><h3>Keyboard triage</h3><p><kbd>Del</kbd> to Recycle Bin, <kbd>F2</kbd> rename, <kbd>Enter</kbd> open — fly through a folder without the mouse.</p></div>
-          <div class="card"><div class="ic">⚡</div><h3>Quick rename</h3><p>Type a name, press <kbd>Enter</kbd>, jump to the next file. Collisions auto-number and the extension is preserved.</p></div>
-          <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p>Renamed or deleted the wrong thing? <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back — files come straight out of the Recycle Bin.</p></div>
+          <div class="card"><div class="ic">⚡</div><h3>Quick rename</h3><p>Type a name, press <kbd>Enter</kbd>, jump to the next file. Collisions auto-number (<code>Clip</code>, <code>Clip 2</code>…) and the extension is preserved.</p></div>
+          <div class="card"><div class="ic">🏷️</div><h3>Quick-use buttons</h3><p>Build a name in one click from your own reusable buttons, plus dynamic buttons for today’s date or the file’s created date — formats configurable in Settings.</p></div>
+          <div class="card"><div class="ic">⌨️</div><h3>Keyboard-first</h3><p><kbd>Del</kbd> to Recycle Bin, <kbd>F2</kbd> rename, <kbd>Enter</kbd> open, <kbd>K</kbd>/<kbd>X</kbd>/<kbd>U</kbd> flag — fly through a folder without the mouse.</p></div>
+          <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p>Renamed, deleted, or committed the wrong thing? <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back — files come straight out of the Recycle Bin.</p></div>
           <div class="card"><div class="ic">🔠</div><h3>Filter &amp; sort</h3><p>Filter by name and toggle file types on or off. Sort by name, size, date, or type — folders always first.</p></div>
           <div class="card"><div class="ic">🗑️</div><h3>Safe by default</h3><p>Deletes go to the Recycle Bin, never a permanent wipe. Multi-select to clear several at once.</p></div>
         </div>
@@ -281,9 +296,9 @@
         <p class="sub">No setup rituals — it lives in the menu you already use.</p>
         <div class="steps">
           <div class="step"><h3>Right-click a folder</h3><p>Pick <strong>Clean this folder</strong> from the Explorer context menu (or the background of an open folder).</p></div>
-          <div class="step"><h3>Preview as you go</h3><p>Arrow through the list — each file previews instantly on the right, audio and video included.</p></div>
-          <div class="step"><h3>Rename or clear</h3><p>Quick-rename a run of clips with <kbd>Enter</kbd>, or send junk to the Recycle Bin with <kbd>Del</kbd>.</p></div>
-          <div class="step"><h3>Undo mistakes</h3><p>Changed your mind? <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the last rename or delete, no digging required.</p></div>
+          <div class="step"><h3>Swipe through it</h3><p>Preview each file and flag it keep or reject — swipe, <kbd>←</kbd>/<kbd>→</kbd>, or <kbd>K</kbd>/<kbd>X</kbd>. Rename a run of clips with <kbd>Enter</kbd> along the way.</p></div>
+          <div class="step"><h3>Commit once</h3><p>Review both piles, then <strong>Commit</strong>: rejects go to the Recycle Bin and keepers can move to a folder you choose.</p></div>
+          <div class="step"><h3>Undo mistakes</h3><p>Changed your mind? <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the last rename, delete, or the whole commit — no digging required.</p></div>
         </div>
       </div>
     </section>
@@ -309,12 +324,13 @@
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip
-./build.ps1 -Version 0.1.0</code></pre>
+./build.ps1 -Version 0.3.0</code></pre>
           </div>
         </div>
         <div class="callout">
           <strong>Windows 11 note:</strong> the entry appears under <strong>Show more options</strong> (the classic menu),
-          or immediately when you <kbd>Shift</kbd>+right-click. A top-level Windows 11 menu entry is on the roadmap.
+          or immediately when you <kbd>Shift</kbd>+right-click. For a top-level entry (no “Show more options” detour),
+          build the sparse MSIX package — see <a href="https://github.com/JacobPoteet/ExplorerHelper/blob/main/packaging/README.md">packaging/README.md</a>.
         </div>
       </div>
     </section>
