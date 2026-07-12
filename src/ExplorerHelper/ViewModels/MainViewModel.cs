@@ -41,6 +41,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _statusText = "No folder loaded";
 
+    /// <summary>
+    /// LIFO journal of reversible actions — renames and deletes (issue #9). Each entry knows how
+    /// to undo itself on disk; <see cref="Undo"/> reloads the folder afterwards so the list always
+    /// matches reality. <see cref="CanUndo"/> drives the toolbar button and Ctrl+Z.
+    /// </summary>
+    private readonly Stack<UndoOperation> _undoStack = new();
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
+    private bool _canUndo;
+
+    private sealed record UndoOperation(string Label, Func<string?> Reverse);
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ContextMenuButtonText))]
     private bool _contextMenuRegistered = ContextMenuRegistrar.IsRegistered;
@@ -129,15 +142,83 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Moves the given entries to the Recycle Bin and removes them from the list.</summary>
     public void Delete(IReadOnlyList<FileEntry> entries)
     {
+        // Remember where each item landed in the Recycle Bin so undo can put it back (issue #9).
+        var restorable = new List<(string Original, string Recycled)>();
         foreach (var entry in entries)
         {
-            if (RecycleBinService.MoveToRecycleBin(entry.FullPath))
+            var recycled = RecycleBinService.MoveToRecycleBin(entry.FullPath);
+            if (recycled is not null)
             {
+                restorable.Add((entry.FullPath, recycled));
                 Files.Remove(entry);
                 _allEntries.Remove(entry);
             }
         }
+
+        if (restorable.Count > 0)
+        {
+            var label = restorable.Count == 1
+                ? $"delete “{Path.GetFileName(restorable[0].Original)}”"
+                : $"delete {restorable.Count} items";
+            PushUndo(label, () => ReverseDelete(restorable));
+        }
         UpdateStatus();
+    }
+
+    // --- Undo journal (issue #9) -----------------------------------------------------
+
+    private void PushUndo(string label, Func<string?> reverse)
+    {
+        _undoStack.Push(new UndoOperation(label, reverse));
+        CanUndo = true;
+    }
+
+    /// <summary>Reverses the most recent rename or delete, then reloads the folder to match disk.</summary>
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
+    {
+        if (_undoStack.Count == 0)
+            return;
+
+        var op = _undoStack.Pop();
+        CanUndo = _undoStack.Count > 0;
+
+        var error = op.Reverse();
+
+        if (!string.IsNullOrEmpty(FolderPath))
+            LoadFolder(FolderPath); // rebuilds the list; UpdateStatus runs inside
+        StatusText = error is null ? $"Undone: {op.Label}" : $"Undo failed — {error}";
+    }
+
+    /// <summary>Moves a renamed item back to its previous path. Returns an error message or null.</summary>
+    private static string? ReverseRename(string currentPath, string previousPath, bool isDirectory)
+    {
+        if (File.Exists(previousPath) || Directory.Exists(previousPath))
+            return $"“{Path.GetFileName(previousPath)}” already exists.";
+        if (!File.Exists(currentPath) && !Directory.Exists(currentPath))
+            return "the file is no longer where it was.";
+        try
+        {
+            if (isDirectory)
+                Directory.Move(currentPath, previousPath);
+            else
+                File.Move(currentPath, previousPath);
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+        return null;
+    }
+
+    /// <summary>Restores a batch of recycled items to their original locations.</summary>
+    private static string? ReverseDelete(IReadOnlyList<(string Original, string Recycled)> items)
+    {
+        var failed = 0;
+        foreach (var (original, recycled) in items)
+            if (!RecycleBinService.Restore(recycled, original))
+                failed++;
+        return failed == 0 ? null : $"{failed} of {items.Count} item(s) could not be restored.";
     }
 
     /// <summary>Renames the entry on disk; returns an error message or null on success.</summary>
@@ -148,22 +229,25 @@ public partial class MainViewModel : ObservableObject
         if (newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             return "The name contains invalid characters.";
 
-        var newPath = Path.Combine(Path.GetDirectoryName(entry.FullPath)!, newName);
+        var oldPath = entry.FullPath;
+        var newPath = Path.Combine(Path.GetDirectoryName(oldPath)!, newName);
         if (File.Exists(newPath) || Directory.Exists(newPath))
             return "A file or folder with that name already exists.";
 
+        var wasDir = entry.IsDirectory;
         try
         {
-            if (entry.IsDirectory)
-                Directory.Move(entry.FullPath, newPath);
+            if (wasDir)
+                Directory.Move(oldPath, newPath);
             else
-                File.Move(entry.FullPath, newPath);
+                File.Move(oldPath, newPath);
         }
         catch (Exception ex)
         {
             return ex.Message;
         }
 
+        PushUndo($"rename to “{newName}”", () => ReverseRename(newPath, oldPath, wasDir));
         Refresh();
         return null;
     }
@@ -201,12 +285,14 @@ public partial class MainViewModel : ObservableObject
         if (string.Equals(targetPath, entry.FullPath, StringComparison.OrdinalIgnoreCase))
             return null;
 
+        var oldPath = entry.FullPath;
+        var wasDir = entry.IsDirectory;
         try
         {
-            if (entry.IsDirectory)
-                Directory.Move(entry.FullPath, targetPath);
+            if (wasDir)
+                Directory.Move(oldPath, targetPath);
             else
-                File.Move(entry.FullPath, targetPath);
+                File.Move(oldPath, targetPath);
         }
         catch (Exception ex)
         {
@@ -214,6 +300,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         entry.UpdatePath(targetPath);
+        PushUndo($"rename to “{targetName}”", () => ReverseRename(targetPath, oldPath, wasDir));
         UpdateStatus();
         return null;
     }

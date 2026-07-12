@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Explorer Helper — clean and organize folders from the right-click menu</title>
+  <meta name="description" content="Clean and organize any Windows folder straight from the Explorer right-click menu. Previews, keyboard triage, quick rename, and one-key undo." />
+  <meta property="og:title" content="Explorer Helper" />
+  <meta property="og:description" content="Clean and organize any Windows folder straight from the Explorer right-click menu." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧹</text></svg>" />
+  <style>
+    :root {
+      --bg: #1e1e24;
+      --bg-2: #25262e;
+      --bg-3: #2a2c34;
+      --panel: #33353f;
+      --border: #4a4c58;
+      --text: #e8e8ec;
+      --muted: #9da0ac;
+      --accent: #8ab4f8;
+      --accent-2: #b39ddb;
+      --ok: #7ee2a8;
+      --radius: 12px;
+      --maxw: 1080px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(138,180,248,.14), transparent 60%),
+        radial-gradient(900px 500px at 0% 10%, rgba(179,157,219,.10), transparent 55%),
+        var(--bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+
+    /* Nav */
+    header.nav {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(10px);
+      background: rgba(30,30,36,.72);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner { display: flex; align-items: center; gap: 16px; height: 60px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 1.05rem; }
+    .brand .logo { font-size: 1.4rem; }
+    .nav-links { margin-left: auto; display: flex; gap: 22px; align-items: center; }
+    .nav-links a { color: var(--muted); font-size: .95rem; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .btn {
+      display: inline-block; padding: 10px 18px; border-radius: 10px;
+      font-weight: 600; border: 1px solid var(--border); cursor: pointer;
+      transition: transform .06s ease, background .15s ease, border-color .15s ease;
+    }
+    .btn:hover { text-decoration: none; transform: translateY(-1px); }
+    .btn-primary { background: linear-gradient(180deg, #9cc0fb, #6fa0f6); color: #10131a; border-color: transparent; }
+    .btn-primary:hover { background: linear-gradient(180deg, #aecbfc, #7eabf7); }
+    .btn-ghost { background: var(--panel); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--accent); }
+
+    /* Hero */
+    .hero { padding: 78px 0 42px; }
+    .hero h1 { font-size: clamp(2.1rem, 5vw, 3.4rem); line-height: 1.1; margin: 0 0 16px; letter-spacing: -.5px; }
+    .hero .grad { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p.lead { font-size: 1.2rem; color: var(--muted); max-width: 640px; margin: 0 0 28px; }
+    .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
+    .badges img { height: 20px; }
+    .note { color: var(--muted); font-size: .9rem; margin-top: 14px; }
+    kbd {
+      font-family: "Cascadia Code", Consolas, monospace; font-size: .82em;
+      background: var(--bg-3); border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 6px; padding: 1px 7px; color: var(--text);
+    }
+
+    /* App mock */
+    .mock {
+      margin: 40px auto 0; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--bg-2); overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.45);
+    }
+    .mock-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--border); }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+    .mock-bar .title { margin-left: 10px; color: var(--muted); font-size: .85rem; }
+    .mock-toolbar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .pill { background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; font-size: .82rem; color: var(--text); }
+    .pill.grow { flex: 1; color: var(--muted); }
+    .mock-body { display: grid; grid-template-columns: 1.6fr 1fr; min-height: 320px; }
+    .filelist { border-right: 1px solid var(--border); }
+    .fl-head, .fl-row { display: grid; grid-template-columns: 34px 1fr 92px 60px; gap: 8px; padding: 8px 14px; align-items: center; }
+    .fl-head { background: var(--bg-3); color: var(--muted); font-size: .78rem; border-bottom: 1px solid var(--border); }
+    .fl-row { border-bottom: 1px solid rgba(74,76,88,.35); font-size: .86rem; }
+    .fl-row.sel { background: rgba(138,180,248,.14); }
+    .thumb { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-size: .95rem; }
+    .thumb.img { background: linear-gradient(135deg,#6f86d6,#48c6ef); }
+    .thumb.vid { background: linear-gradient(135deg,#c94b4b,#4b134f); }
+    .thumb.aud { background: linear-gradient(135deg,#396afc,#2948ff); }
+    .thumb.doc { background: linear-gradient(135deg,#485563,#29323c); }
+    .thumb.fld { background: linear-gradient(135deg,#f6d365,#c79100); }
+    .muted { color: var(--muted); }
+    .num { text-align: right; }
+    .preview { padding: 16px; display: flex; flex-direction: column; }
+    .preview-stage { flex: 1; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); display: grid; place-items: center; text-align: center; padding: 20px; }
+    .spk { color: var(--accent); }
+    .preview-name { margin-top: 12px; font-size: .95rem; }
+    .preview-sub { color: var(--muted); font-size: .8rem; }
+    .rename { margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); }
+    .rename label { color: var(--muted); font-size: .72rem; }
+    .rename .field { display: flex; gap: 6px; margin-top: 6px; }
+    .rename input { flex: 1; background: var(--bg-3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 9px; font: inherit; font-size: .85rem; }
+    .rename .ext { color: var(--muted); align-self: center; font-size: .82rem; }
+    .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .chip { background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: .76rem; }
+
+    /* Sections */
+    section { padding: 62px 0; }
+    section h2 { font-size: clamp(1.6rem, 3.5vw, 2.2rem); margin: 0 0 8px; letter-spacing: -.3px; }
+    section .sub { color: var(--muted); margin: 0 0 34px; font-size: 1.05rem; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
+    .card {
+      background: linear-gradient(180deg, var(--bg-2), rgba(37,38,46,.6));
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 22px;
+      transition: transform .1s ease, border-color .15s ease;
+    }
+    .card:hover { transform: translateY(-3px); border-color: rgba(138,180,248,.55); }
+    .card .ic { font-size: 1.6rem; }
+    .card h3 { margin: 12px 0 6px; font-size: 1.12rem; }
+    .card p { margin: 0; color: var(--muted); font-size: .95rem; }
+
+    /* Steps */
+    .steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 18px; }
+    .step { position: relative; padding: 22px 22px 22px 22px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #10131a;
+      font-weight: 700; margin-bottom: 12px;
+    }
+    .step h3 { margin: 0 0 6px; font-size: 1.05rem; }
+    .step p { margin: 0; color: var(--muted); font-size: .92rem; }
+
+    /* Install */
+    .install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .install-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+    .install-card h3 { margin-top: 0; }
+    pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-x: auto; font-family: "Cascadia Code", Consolas, monospace; font-size: .85rem; color: #d6d9e2; }
+    .callout { border-left: 3px solid var(--accent); background: rgba(138,180,248,.08); padding: 12px 16px; border-radius: 0 8px 8px 0; color: var(--muted); font-size: .92rem; margin-top: 20px; }
+
+    footer { border-top: 1px solid var(--border); padding: 34px 0; color: var(--muted); font-size: .9rem; }
+    .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+    @media (max-width: 760px) {
+      .mock-body { grid-template-columns: 1fr; }
+      .filelist { border-right: none; border-bottom: 1px solid var(--border); }
+      .install-grid { grid-template-columns: 1fr; }
+      .nav-links a:not(.btn) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <div class="brand"><span class="logo">🧹</span> Explorer Helper</div>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/JacobPoteet/ExplorerHelper">GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <div class="wrap hero">
+      <h1>Clean up any folder<br /><span class="grad">without leaving Explorer.</span></h1>
+      <p class="lead">
+        Right-click a folder, hit <strong>Clean this folder</strong>, and triage its contents with
+        live previews and keyboard shortcuts. Built for taming folders of clips, screenshots, and downloads.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">⬇ Download for Windows</a>
+        <a class="btn btn-ghost" href="https://github.com/JacobPoteet/ExplorerHelper">View source</a>
+      </div>
+      <div class="badges">
+        <a href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/JacobPoteet/ExplorerHelper?label=release&sort=semver" /></a>
+        <a href="https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml/badge.svg" /></a>
+        <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" />
+        <img alt="Windows 10 / 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0a7bff" />
+      </div>
+      <p class="note">Per-user install — no admin prompt. <kbd>Del</kbd> sends to the Recycle Bin, never permanent deletion.</p>
+
+      <!-- App mock -->
+      <div class="mock" role="img" aria-label="Screenshot of the Explorer Helper window: a sortable file list on the left and a preview pane on the right.">
+        <div class="mock-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="title">Explorer Helper — C:\Users\you\Videos\Clips</span>
+        </div>
+        <div class="mock-toolbar">
+          <span class="pill grow">🔎 Filter files by name…</span>
+          <span class="pill">Types ▾</span>
+          <span class="pill">Refresh</span>
+          <span class="pill">↩ Undo</span>
+          <span class="pill">Open in Explorer</span>
+        </div>
+        <div class="mock-body">
+          <div class="filelist">
+            <div class="fl-head"><span></span><span>Name ▲</span><span>Date</span><span class="num">Size</span></div>
+            <div class="fl-row"><span class="thumb fld">📁</span><span>Keepers</span><span class="muted">2026-07-02</span><span class="num muted">—</span></div>
+            <div class="fl-row"><span class="thumb img">🖼</span><span>screenshot 2026-07-04.png</span><span class="muted">07-04 14:22</span><span class="num">1.2 MB</span></div>
+            <div class="fl-row sel"><span class="thumb aud">🔊</span><span>voice-memo.m4a</span><span class="muted">07-05 09:10</span><span class="num">4.8 MB</span></div>
+            <div class="fl-row"><span class="thumb vid">🎬</span><span>clip_0421.mp4</span><span class="muted">07-05 18:03</span><span class="num">88 MB</span></div>
+            <div class="fl-row"><span class="thumb doc">📄</span><span>notes.pdf</span><span class="muted">07-06 11:47</span><span class="num">320 KB</span></div>
+            <div class="fl-row"><span class="thumb vid">🎬</span><span>clip_0422.mp4</span><span class="muted">07-06 20:15</span><span class="num">102 MB</span></div>
+          </div>
+          <div class="preview">
+            <div class="preview-stage">
+              <div>
+                <svg class="spk" width="88" height="88" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3,9 L6,9 L10.5,5 L10.5,19 L6,15 L3,15 Z" fill="currentColor"/>
+                  <path d="M13.5,8.5 C15.3,10.5 15.3,13.5 13.5,15.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M16,6 C19.5,9 19.5,15 16,18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+                <div class="preview-name">voice-memo.m4a</div>
+                <div class="preview-sub">M4A · 4.8 MB · playing</div>
+              </div>
+            </div>
+            <div class="rename">
+              <label>QUICK RENAME</label>
+              <div class="field">
+                <input value="Interview" readonly />
+                <span class="ext">.m4a</span>
+              </div>
+              <div class="chips">
+                <span class="chip">Interview</span>
+                <span class="chip">B-roll</span>
+                <span class="chip">Keeper</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap"><div class="divider"></div></div>
+
+    <!-- Features -->
+    <section id="features">
+      <div class="wrap">
+        <h2>Everything you need to triage a folder</h2>
+        <p class="sub">Previews, filters, and keyboard-first flows — none of it leaves your machine.</p>
+        <div class="grid">
+          <div class="card"><div class="ic">🖱️</div><h3>Explorer context menu</h3><p>“Clean this folder” on folders and folder backgrounds. Per-user, no admin required.</p></div>
+          <div class="card"><div class="ic">👁️</div><h3>Live previews</h3><p>Images render natively, video and audio play inline, and PDFs open in the built-in viewer.</p></div>
+          <div class="card"><div class="ic">🔊</div><h3>Audio, clearly</h3><p>Audio-only files show a speaker so you always know which file is selected and playing.</p></div>
+          <div class="card"><div class="ic">⌨️</div><h3>Keyboard triage</h3><p><kbd>Del</kbd> to Recycle Bin, <kbd>F2</kbd> rename, <kbd>Enter</kbd> open — fly through a folder without the mouse.</p></div>
+          <div class="card"><div class="ic">⚡</div><h3>Quick rename</h3><p>Type a name, press <kbd>Enter</kbd>, jump to the next file. Collisions auto-number and the extension is preserved.</p></div>
+          <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p>Renamed or deleted the wrong thing? <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back — files come straight out of the Recycle Bin.</p></div>
+          <div class="card"><div class="ic">🔠</div><h3>Filter &amp; sort</h3><p>Filter by name and toggle file types on or off. Sort by name, size, date, or type — folders always first.</p></div>
+          <div class="card"><div class="ic">🗑️</div><h3>Safe by default</h3><p>Deletes go to the Recycle Bin, never a permanent wipe. Multi-select to clear several at once.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap"><div class="divider"></div></div>
+
+    <!-- How it works -->
+    <section id="how">
+      <div class="wrap">
+        <h2>From cluttered to clean in four steps</h2>
+        <p class="sub">No setup rituals — it lives in the menu you already use.</p>
+        <div class="steps">
+          <div class="step"><h3>Right-click a folder</h3><p>Pick <strong>Clean this folder</strong> from the Explorer context menu (or the background of an open folder).</p></div>
+          <div class="step"><h3>Preview as you go</h3><p>Arrow through the list — each file previews instantly on the right, audio and video included.</p></div>
+          <div class="step"><h3>Rename or clear</h3><p>Quick-rename a run of clips with <kbd>Enter</kbd>, or send junk to the Recycle Bin with <kbd>Del</kbd>.</p></div>
+          <div class="step"><h3>Undo mistakes</h3><p>Changed your mind? <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the last rename or delete, no digging required.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap"><div class="divider"></div></div>
+
+    <!-- Install -->
+    <section id="install">
+      <div class="wrap">
+        <h2>Install</h2>
+        <p class="sub">Grab the installer, or run from source.</p>
+        <div class="install-grid">
+          <div class="install-card">
+            <h3>⬇ Installer (recommended)</h3>
+            <p class="muted">Download <code>ExplorerHelper-Setup-*.exe</code> from the latest release and run it. It installs per-user (no admin prompt) and registers the context-menu entries. Uninstalling removes them again.</p>
+            <p><a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Download latest release</a></p>
+            <p class="muted" style="font-size:.85rem">A portable zip is published with every release too — use the <strong>Add context menu</strong> button inside the app.</p>
+          </div>
+          <div class="install-card">
+            <h3>🛠 Build from source</h3>
+            <p class="muted">Requires the .NET SDK 8 or newer.</p>
+            <pre><code># Debug run
+dotnet run --project src/ExplorerHelper
+
+# Publish self-contained exe + portable zip
+./build.ps1 -Version 0.1.0</code></pre>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>Windows 11 note:</strong> the entry appears under <strong>Show more options</strong> (the classic menu),
+          or immediately when you <kbd>Shift</kbd>+right-click. A top-level Windows 11 menu entry is on the roadmap.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <div>🧹 <strong>Explorer Helper</strong> — MIT licensed. Made by <a href="https://github.com/JacobPoteet">Jacob Poteet</a>.</div>
+      <div>
+        <a href="https://github.com/JacobPoteet/ExplorerHelper">GitHub</a> ·
+        <a href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Releases</a> ·
+        <a href="https://github.com/JacobPoteet/ExplorerHelper/issues">Issues</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

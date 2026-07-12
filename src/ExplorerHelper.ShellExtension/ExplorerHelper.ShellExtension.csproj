@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
+    <!-- Produces ExplorerHelper.ShellExtension.comhost.dll: a native in-proc COM server that
+         hosts the CLR and exposes every [ComVisible] [Guid] class. The Windows 11 context-menu
+         surrogate loads this DLL and asks it for our IExplorerCommand handler (issue #11). -->
+    <EnableComHosting>true</EnableComHosting>
+
+    <AssemblyTitle>Explorer Helper Shell Extension</AssemblyTitle>
+    <Description>Windows 11 top-level context menu handler for Explorer Helper.</Description>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

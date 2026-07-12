@@ -11,9 +11,10 @@ and triage its contents with previews and keyboard shortcuts.
 ## Features
 
 - **Explorer context menu** — "Clean this folder" on folders and folder backgrounds (per-user, no admin required)
-- **Previews** — images render natively, videos/audio play inline, PDFs render via the built-in Edge WebView2 viewer, and everything else shows the same thumbnail Explorer would
+- **Previews** — images render natively, videos play inline, audio shows a speaker so you know a file is selected and playing, PDFs render via the built-in Edge WebView2 viewer, and everything else shows the same thumbnail Explorer would
 - **Shell thumbnails** in the file list for every file type Windows knows how to thumbnail
 - **Keyboard triage** — `Del` sends to the Recycle Bin (never permanent deletion), `F2` renames, `Enter` opens
+- **Undo** — `Ctrl`+`Z` reverses the last rename or delete; deleted files come straight back out of the Recycle Bin
 - **Quick rename** — review files one by one and name them fast: type a name, press `Enter` to rename and jump to the next file. Collisions auto-number (`Clip`, `Clip 2`, `Clip 3`…), the extension is preserved, and a session name palette re-applies recent names in a click — built for triaging a folder of clips or screenshots
 - **Filter & sort** by name, size, date, or type — folders always listed first
 - Multi-select delete, open in Explorer, one-click context-menu install/uninstall from inside the app
@@ -24,8 +25,6 @@ and triage its contents with previews and keyboard shortcuts.
 - Sort into subfolders by extension/date rules
 - Empty-folder sweep and folder size breakdown
 - "Untouched for N months" age filter
-- Undo journal for rename/move sessions
-- Windows 11 top-level context menu entry (`IExplorerCommand` + sparse MSIX)
 
 ## Install
 
@@ -36,7 +35,8 @@ removes them again. A portable zip is also published with each release — with 
 version, use the **Add context menu** button inside the app.
 
 > **Windows 11 note:** the entry appears under **Show more options** (the classic menu),
-> or immediately when you `Shift`+right-click.
+> or immediately when you `Shift`+right-click. For a **top-level** Windows 11 menu entry (no
+> "Show more options" detour), build the sparse MSIX package — see [`packaging/README.md`](packaging/README.md).
 
 ## Building locally
 
