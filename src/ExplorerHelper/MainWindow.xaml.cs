@@ -2,11 +2,8 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using Microsoft.Web.WebView2.Wpf;
 using ExplorerHelper.Models;
-using ExplorerHelper.Services;
 using ExplorerHelper.ViewModels;
 
 namespace ExplorerHelper;
@@ -15,12 +12,7 @@ namespace ExplorerHelper;
 // with System.Windows types used below (MessageBox, Button, …).
 public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 {
-    private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico", ".tif", ".tiff"];
-    private static readonly string[] VideoExtensions = [".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm", ".m4v"];
-    private static readonly string[] AudioExtensions = [".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma"];
-
     private readonly MainViewModel _vm = new();
-    private bool _webViewReady;
 
     public MainWindow()
     {
@@ -30,17 +22,16 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         {
             if (e.PropertyName == nameof(MainViewModel.SelectedFile))
             {
-                ShowPreview(_vm.SelectedFile);
+                Preview.Show(_vm.SelectedFile);
                 UpdateRenameBar(_vm.SelectedFile);
             }
         };
 
-        // WebView2 must not write its cache next to the exe (read-only when installed).
-        PreviewWeb.CreationProperties = new CoreWebView2CreationProperties
+        TriageOverlay.CloseRequested += (_, _) =>
         {
-            UserDataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ExplorerHelper", "WebView2"),
+            // Coming back from the overlay: restore the side preview and list focus.
+            Preview.Show(_vm.SelectedFile);
+            FileList.Focus();
         };
 
         UpdateSortIndicators();
@@ -76,7 +67,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     /// <summary>Keeps the Name column filling the space the fixed columns leave behind.</summary>
     private void FileList_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        var fixedWidth = IconColumn.ActualWidth + DateColumn.ActualWidth
+        var fixedWidth = IconColumn.ActualWidth + FlagColumn.ActualWidth + DateColumn.ActualWidth
             + TypeColumn.ActualWidth + SizeColumn.ActualWidth;
         var available = FileList.ActualWidth - fixedWidth - SystemParameters.VerticalScrollBarWidth - 12;
         if (available > 120)
@@ -104,7 +95,40 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                     _vm.UndoCommand.Execute(null);
                 e.Handled = true;
                 break;
+            case Key.K:
+                FlagSelected(TriageFlag.Keep);
+                e.Handled = true;
+                break;
+            case Key.X:
+                FlagSelected(TriageFlag.Reject);
+                e.Handled = true;
+                break;
+            case Key.U:
+                FlagSelected(TriageFlag.None);
+                e.Handled = true;
+                break;
         }
+    }
+
+    /// <summary>
+    /// List-mode triage: flags the selection without entering the deck. A single-item flag
+    /// advances to the next row so a run of K/K/X/K stays on the keyboard, like Del does.
+    /// </summary>
+    private void FlagSelected(TriageFlag flag)
+    {
+        var selected = FileList.SelectedItems.Cast<FileEntry>().ToList();
+        if (selected.Count == 0)
+            return;
+        foreach (var entry in selected)
+            _vm.SetFlag(entry, flag);
+        if (selected.Count == 1 && FileList.SelectedIndex < FileList.Items.Count - 1)
+            FileList.SelectedIndex++;
+    }
+
+    private void Triage_Click(object sender, RoutedEventArgs e)
+    {
+        Preview.Clear(); // the deck card takes over the (single) live media handle
+        TriageOverlay.Open(_vm);
     }
 
     private void FileList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -123,7 +147,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         // Release preview handles first. The media engine in particular keeps the
         // video file open, and it releases the OS handle only once its teardown has
         // been pumped through the dispatcher.
-        ClearPreview();
+        Preview.Clear();
 
         // Defer the actual delete to the next message pump (Background priority) so
         // that teardown finishes and the handle is freed before SHFileOperation runs.
@@ -202,7 +226,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         // would fail until the media engine's teardown has been pumped through the dispatcher —
         // the same handle problem the delete path solves (issue #1). Defer the rename to the
         // next Background pump so the handle is freed before we move the file.
-        ClearPreview();
+        Preview.Clear();
 
         Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
         {
@@ -210,7 +234,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             if (error is not null)
             {
                 MessageBox.Show(this, error, "Rename failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-                ShowPreview(_vm.SelectedFile); // restore the preview we cleared
+                Preview.Show(_vm.SelectedFile); // restore the preview we cleared
                 RenameBox.Focus();
                 return;
             }
@@ -218,7 +242,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             // Advance to the next file for the review flow. If we were already on the last one,
             // the selection doesn't change, so re-show its (now cleared) preview ourselves.
             if (!AdvanceSelection())
-                ShowPreview(_vm.SelectedFile);
+                Preview.Show(_vm.SelectedFile);
 
             // Keep focus in the box so a run of similar clips stays keyboard-only.
             RenameBox.SelectAll();
@@ -260,108 +284,4 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             MessageBox.Show(this, error, "Rename failed", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
-    private void ShowPreview(FileEntry? entry)
-    {
-        ClearPreview();
-        if (entry is null)
-        {
-            PreviewPlaceholder.Visibility = Visibility.Visible;
-            return;
-        }
-
-        var ext = Path.GetExtension(entry.FullPath).ToLowerInvariant();
-
-        try
-        {
-            if (!entry.IsDirectory && ImageExtensions.Contains(ext))
-            {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(entry.FullPath);
-                bitmap.CacheOption = BitmapCacheOption.OnLoad; // don't lock the file
-                bitmap.EndInit();
-                PreviewImage.Source = bitmap;
-                PreviewImage.Visibility = Visibility.Visible;
-                return;
-            }
-
-            if (!entry.IsDirectory && (VideoExtensions.Contains(ext) || AudioExtensions.Contains(ext)))
-            {
-                PreviewMedia.Source = new Uri(entry.FullPath);
-                // Keep the media element live so playback runs; for audio it renders no picture,
-                // so overlay a speaker on top (it sits later in the Grid, so it wins z-order) to
-                // make clear a file is selected and playing (issue #8).
-                PreviewMedia.Visibility = Visibility.Visible;
-                if (AudioExtensions.Contains(ext))
-                {
-                    PreviewAudioName.Text = entry.Name;
-                    PreviewAudioDetail.Text = $"{entry.Extension} · {entry.SizeDisplay} · playing";
-                    PreviewAudio.Visibility = Visibility.Visible;
-                }
-                PreviewMedia.Play();
-                return;
-            }
-
-            if (!entry.IsDirectory && ext == ".pdf")
-            {
-                ShowPdf(entry.FullPath);
-                return;
-            }
-        }
-        catch
-        {
-            // fall through to the generic info panel
-        }
-
-        // Everything else: big shell thumbnail + details
-        PreviewInfoThumb.Source = ShellThumbnailService.GetThumbnail(entry.FullPath, 256);
-        PreviewInfoName.Text = entry.Name;
-        PreviewInfoDetail.Text = entry.IsDirectory
-            ? $"Folder · modified {entry.ModifiedDisplay}"
-            : $"{entry.Extension} · {entry.SizeDisplay} · modified {entry.ModifiedDisplay}";
-        PreviewInfo.Visibility = Visibility.Visible;
-    }
-
-    private async void ShowPdf(string path)
-    {
-        try
-        {
-            if (!_webViewReady)
-            {
-                await PreviewWeb.EnsureCoreWebView2Async();
-                _webViewReady = true;
-            }
-            PreviewWeb.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
-            PreviewWeb.Visibility = Visibility.Visible;
-        }
-        catch
-        {
-            // WebView2 runtime missing — show the generic panel instead.
-            PreviewInfoName.Text = Path.GetFileName(path);
-            PreviewInfoDetail.Text = "PDF preview requires the WebView2 runtime.";
-            PreviewInfo.Visibility = Visibility.Visible;
-        }
-    }
-
-    private void ClearPreview()
-    {
-        PreviewPlaceholder.Visibility = Visibility.Collapsed;
-        PreviewImage.Visibility = Visibility.Collapsed;
-        PreviewImage.Source = null;
-        PreviewMedia.Stop();
-        PreviewMedia.Close(); // releases the media session and the underlying file handle
-        PreviewMedia.Source = null;
-        PreviewMedia.Visibility = Visibility.Collapsed;
-        PreviewAudio.Visibility = Visibility.Collapsed;
-        PreviewWeb.Visibility = Visibility.Collapsed;
-        if (_webViewReady)
-            PreviewWeb.CoreWebView2.Navigate("about:blank"); // release the file handle
-        PreviewInfo.Visibility = Visibility.Collapsed;
-    }
-
-    private void PreviewMedia_MediaEnded(object sender, RoutedEventArgs e)
-    {
-        PreviewMedia.Position = TimeSpan.Zero;
-        PreviewMedia.Play();
-    }
 }

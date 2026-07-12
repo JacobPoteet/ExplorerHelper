@@ -18,6 +18,10 @@ public partial class FileEntry : ObservableObject
     [ObservableProperty]
     private BitmapSource? _thumbnail;
 
+    /// <summary>Triage decision (keep/reject) — session-only; applied to disk on commit.</summary>
+    [ObservableProperty]
+    private TriageFlag _flag;
+
     public FileEntry(FileSystemInfo info)
     {
         FullPath = info.FullName;

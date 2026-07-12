@@ -20,6 +20,32 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The distinct file types present in the folder, each toggleable on/off (issue #5).</summary>
     public ObservableCollection<TypeFilter> TypeFilters { get; } = [];
 
+    // --- Triage state ------------------------------------------------------------------
+    // Flags live on the entries; these piles/counts are derived views kept in sync by
+    // RecomputeTriage so the deck header, review screen, and status bar can bind to them.
+
+    /// <summary>Files currently flagged Keep, in folder order.</summary>
+    public ObservableCollection<FileEntry> KeepPile { get; } = [];
+
+    /// <summary>Files currently flagged Reject, in folder order.</summary>
+    public ObservableCollection<FileEntry> RejectPile { get; } = [];
+
+    [ObservableProperty]
+    private int _keepCount;
+
+    [ObservableProperty]
+    private int _rejectCount;
+
+    /// <summary>Files (not folders) with no flag yet — the "still to triage" number.</summary>
+    [ObservableProperty]
+    private int _unmarkedFileCount;
+
+    [ObservableProperty]
+    private string _keepPileSummary = string.Empty;
+
+    [ObservableProperty]
+    private string _rejectPileSummary = string.Empty;
+
     // Set while toggling many type filters at once so ApplyView runs once, not per item.
     private bool _suspendApplyView;
 
@@ -88,6 +114,13 @@ public partial class MainViewModel : ObservableObject
             return;
 
         FolderPath = path;
+
+        // Triage flags must survive a reload (Undo and Refresh both rebuild the list),
+        // so carry them across by path.
+        var previousFlags = _allEntries
+            .Where(e => e.Flag != TriageFlag.None)
+            .ToDictionary(e => e.FullPath, e => e.Flag, StringComparer.OrdinalIgnoreCase);
+
         var dir = new DirectoryInfo(path);
         _allEntries = dir.EnumerateDirectories()
             .Cast<FileSystemInfo>()
@@ -95,7 +128,12 @@ public partial class MainViewModel : ObservableObject
             .Select(info => new FileEntry(info))
             .ToList();
 
+        foreach (var entry in _allEntries)
+            if (previousFlags.TryGetValue(entry.FullPath, out var flag))
+                entry.Flag = flag;
+
         BuildTypeFilters();
+        RecomputeTriage();
         ApplyView();
         LoadThumbnailsInBackground();
     }
@@ -162,7 +200,146 @@ public partial class MainViewModel : ObservableObject
                 : $"delete {restorable.Count} items";
             PushUndo(label, () => ReverseDelete(restorable));
         }
+        RecomputeTriage(); // deleted entries drop out of the piles; also refreshes the status bar
+    }
+
+    // --- Triage (flag then commit) ----------------------------------------------------
+
+    /// <summary>
+    /// Flags a file for triage. Folders are ignored — the deck and the commit only ever
+    /// touch files, so a folder can never be flagged into the reject pile.
+    /// </summary>
+    public void SetFlag(FileEntry entry, TriageFlag flag)
+    {
+        if (entry.IsDirectory || entry.Flag == flag)
+            return;
+        entry.Flag = flag;
+        RecomputeTriage();
+    }
+
+    /// <summary>Discards every triage mark (used when the user exits without committing).</summary>
+    public void ClearAllFlags()
+    {
+        foreach (var entry in _allEntries)
+            entry.Flag = TriageFlag.None;
+        RecomputeTriage();
+    }
+
+    /// <summary>Rebuilds the derived piles/counts from the entries' flags.</summary>
+    private void RecomputeTriage()
+    {
+        KeepPile.Clear();
+        RejectPile.Clear();
+        long keepBytes = 0, rejectBytes = 0;
+        var unmarked = 0;
+
+        foreach (var entry in _allEntries)
+        {
+            if (entry.IsDirectory)
+                continue;
+            switch (entry.Flag)
+            {
+                case TriageFlag.Keep:
+                    KeepPile.Add(entry);
+                    keepBytes += entry.SizeBytes;
+                    break;
+                case TriageFlag.Reject:
+                    RejectPile.Add(entry);
+                    rejectBytes += entry.SizeBytes;
+                    break;
+                default:
+                    unmarked++;
+                    break;
+            }
+        }
+
+        KeepCount = KeepPile.Count;
+        RejectCount = RejectPile.Count;
+        UnmarkedFileCount = unmarked;
+        KeepPileSummary = $"{KeepCount} · {FileEntry.FormatSize(keepBytes)}";
+        RejectPileSummary = $"{RejectCount} · {FileEntry.FormatSize(rejectBytes)}";
         UpdateStatus();
+    }
+
+    /// <summary>
+    /// Applies the triage decisions to disk in one shot: rejects go to the Recycle Bin and —
+    /// when <paramref name="keepDestination"/> is set — keepers move there (collisions
+    /// auto-number). Pushes a single undo entry that reverses the whole commit. Returns an
+    /// error summary, or null when every file was processed.
+    /// </summary>
+    public string? CommitTriage(string? keepDestination)
+    {
+        var rejects = _allEntries.Where(e => !e.IsDirectory && e.Flag == TriageFlag.Reject).ToList();
+        var keeps = _allEntries.Where(e => !e.IsDirectory && e.Flag == TriageFlag.Keep).ToList();
+
+        var failures = 0;
+
+        var recycled = new List<(string Original, string Recycled)>();
+        foreach (var entry in rejects)
+        {
+            var binPath = RecycleBinService.MoveToRecycleBin(entry.FullPath);
+            if (binPath is not null)
+                recycled.Add((entry.FullPath, binPath));
+            else
+                failures++;
+        }
+
+        var moved = new List<(string From, string To)>();
+        if (!string.IsNullOrWhiteSpace(keepDestination))
+        {
+            foreach (var entry in keeps)
+            {
+                var stem = Path.GetFileNameWithoutExtension(entry.FullPath);
+                var ext = Path.GetExtension(entry.FullPath);
+                var target = Path.Combine(
+                    keepDestination, NextAvailableName(keepDestination, stem, ext, entry.FullPath));
+                if (string.Equals(target, entry.FullPath, StringComparison.OrdinalIgnoreCase))
+                    continue; // destination is the folder it's already in
+                try
+                {
+                    File.Move(entry.FullPath, target); // handles cross-volume (SD card → disk)
+                    moved.Add((entry.FullPath, target));
+                }
+                catch
+                {
+                    failures++;
+                }
+            }
+        }
+
+        if (recycled.Count > 0 || moved.Count > 0)
+        {
+            var label = moved.Count > 0
+                ? $"triage commit ({recycled.Count} recycled, {moved.Count} moved)"
+                : $"triage commit ({recycled.Count} recycled)";
+            PushUndo(label, () => ReverseCommit(moved, recycled));
+        }
+
+        // The session is done — clear every flag before the reload so none carry over.
+        foreach (var entry in _allEntries)
+            entry.Flag = TriageFlag.None;
+        LoadFolder(FolderPath);
+
+        var summary = $"Triage committed — {recycled.Count} recycled"
+            + (moved.Count > 0 ? $", {moved.Count} moved" : $", {keeps.Count} kept in place");
+        StatusText = failures == 0 ? summary : $"{summary} · {failures} failed";
+        return failures == 0 ? null : $"{failures} file(s) could not be processed.";
+    }
+
+    /// <summary>Reverses a whole triage commit: moves keepers back, restores recycled rejects.</summary>
+    private static string? ReverseCommit(
+        IReadOnlyList<(string From, string To)> moved,
+        IReadOnlyList<(string Original, string Recycled)> recycled)
+    {
+        var failed = 0;
+        foreach (var (from, to) in moved)
+            if (ReverseRename(to, from, isDirectory: false) is not null)
+                failed++;
+        foreach (var (original, bin) in recycled)
+            if (!RecycleBinService.Restore(bin, original))
+                failed++;
+        var total = moved.Count + recycled.Count;
+        return failed == 0 ? null : $"{failed} of {total} item(s) could not be restored.";
     }
 
     // --- Undo journal (issue #9) -----------------------------------------------------
@@ -419,7 +596,10 @@ public partial class MainViewModel : ObservableObject
         var folders = Files.Count(f => f.IsDirectory);
         var files = Files.Count - folders;
         var totalSize = Files.Where(f => !f.IsDirectory).Sum(f => f.SizeBytes);
-        StatusText = $"{files} files, {folders} folders — {FileEntry.FormatSize(totalSize)}";
+        var triage = KeepCount + RejectCount > 0
+            ? $" · triage: ✓ {KeepCount} keep, ✗ {RejectCount} reject"
+            : string.Empty;
+        StatusText = $"{files} files, {folders} folders — {FileEntry.FormatSize(totalSize)}{triage}";
     }
 
     private void LoadThumbnailsInBackground()
