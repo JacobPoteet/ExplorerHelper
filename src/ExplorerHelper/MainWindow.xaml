@@ -1,71 +1,135 @@
-<Window x:Class="ExplorerHelper.MainWindow"
+<ui:FluentWindow x:Class="ExplorerHelper.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:vm="clr-namespace:ExplorerHelper.ViewModels"
         Title="Explorer Helper"
         Height="720" Width="1180"
         WindowStartupLocation="CenterScreen"
-        Background="#1E1E24">
-    <Window.Resources>
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="Margin" Value="4,0,0,0" />
-            <Setter Property="Background" Value="#33353F" />
-            <Setter Property="Foreground" Value="#E8E8EC" />
-            <Setter Property="BorderBrush" Value="#4A4C58" />
-        </Style>
-        <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#E8E8EC" />
-        </Style>
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        WindowCornerPreference="Round"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    <ui:FluentWindow.Resources>
+        <!--
+          GridView keeps WPF's old Aero (Windows 7) chrome — a gradient column header and a
+          bright gradient row selection that light text can't sit on. WPF-UI doesn't retheme
+          those, so we fully retemplate both with flat, Fluent-style visuals.
+        -->
         <Style TargetType="GridViewColumnHeader">
-            <Setter Property="Background" Value="#2A2C34" />
-            <Setter Property="Foreground" Value="#E8E8EC" />
-            <Setter Property="BorderBrush" Value="#4A4C58" />
-            <Setter Property="BorderThickness" Value="0,0,1,1" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GridViewColumnHeader">
+                        <Border x:Name="HdrBd" Background="Transparent" Padding="10,8"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="0,0,0,1">
+                            <ContentPresenter VerticalAlignment="Center"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              Content="{TemplateBinding Content}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HdrBd" Property="Background"
+                                        Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="HdrBd" Property="Background"
+                                        Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-    </Window.Resources>
+
+        <Style TargetType="ListViewItem">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="Bd" Margin="0,1" CornerRadius="4"
+                                Background="Transparent"
+                                BorderBrush="Transparent" BorderThickness="1">
+                            <GridViewRowPresenter VerticalAlignment="Center" Margin="0,4"
+                                Content="{TemplateBinding Content}"
+                                Columns="{Binding Path=View.Columns,
+                                          RelativeSource={RelativeSource AncestorType={x:Type ListView}}}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                <Setter TargetName="Bd" Property="BorderBrush"
+                                        Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ui:FluentWindow.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- Title bar (custom, draggable, with window controls) -->
+        <ui:TitleBar Grid.Row="0" Title="Explorer Helper">
+            <ui:TitleBar.Icon>
+                <ui:SymbolIcon Symbol="Folder24" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
         <!-- Toolbar -->
-        <DockPanel Grid.Row="0" Margin="10" LastChildFill="True">
-            <Button DockPanel.Dock="Right" Content="{Binding ContextMenuButtonText}"
-                    Command="{Binding ToggleContextMenuCommand}" />
-            <Button DockPanel.Dock="Right" Content="Open in Explorer" Command="{Binding OpenInExplorerCommand}" />
-            <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" />
-            <ToggleButton x:Name="TypesButton" DockPanel.Dock="Right" Content="Types ▾"
-                          Padding="10,5" Margin="4,0,0,0"
-                          Background="#33353F" Foreground="#E8E8EC" BorderBrush="#4A4C58"
-                          ToolTip="Show or hide files by type" />
+        <DockPanel Grid.Row="1" Margin="12,4,12,10" LastChildFill="True">
+            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
+                       Content="{Binding ContextMenuButtonText}"
+                       Command="{Binding ToggleContextMenuCommand}" />
+            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
+                       Content="Open in Explorer" Icon="{ui:SymbolIcon Open24}"
+                       Command="{Binding OpenInExplorerCommand}" />
+            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
+                       Content="Refresh" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                       Command="{Binding RefreshCommand}" />
+            <ToggleButton x:Name="TypesButton" DockPanel.Dock="Right" Margin="6,0,0,0"
+                          Content="Types" ToolTip="Show or hide files by type" />
             <Popup PlacementTarget="{Binding ElementName=TypesButton}" Placement="Bottom"
                    StaysOpen="False" AllowsTransparency="True"
                    IsOpen="{Binding IsChecked, ElementName=TypesButton, Mode=TwoWay}">
-                <Border Background="#2A2C34" BorderBrush="#4A4C58" BorderThickness="1" Padding="8" MinWidth="200">
+                <Border Background="{DynamicResource ApplicationBackgroundBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,6,0,0"
+                        MinWidth="220">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <Button Content="All" Command="{Binding ShowAllTypesCommand}"
-                                    Padding="12,3" Margin="0" />
-                            <Button Content="None" Command="{Binding HideAllTypesCommand}"
-                                    Padding="12,3" Margin="6,0,0,0" />
+                            <ui:Button Content="All" Command="{Binding ShowAllTypesCommand}" />
+                            <ui:Button Content="None" Command="{Binding HideAllTypesCommand}" Margin="6,0,0,0" />
                         </StackPanel>
                         <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding TypeFilters}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsChecked}" Margin="0,3" Foreground="#E8E8EC">
+                                        <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Display}" />
                                                 <TextBlock Text="{Binding Count, StringFormat=' ({0})'}"
-                                                           Foreground="#9DA0AC" />
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                                             </StackPanel>
                                         </CheckBox>
                                     </DataTemplate>
@@ -75,101 +139,107 @@
                     </StackPanel>
                 </Border>
             </Popup>
-            <TextBox x:Name="FilterBox" Margin="0,0,8,0" Padding="6,4"
-                     Background="#2A2C34" Foreground="#E8E8EC" BorderBrush="#4A4C58"
-                     Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="Filter files by name" />
+            <ui:TextBox x:Name="FilterBox" Icon="{ui:SymbolIcon Search24}"
+                        PlaceholderText="Filter files by name"
+                        Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" />
         </DockPanel>
 
         <!-- Main split: file list | preview -->
-        <Grid Grid.Row="1" Margin="10,0,10,0">
+        <Grid Grid.Row="2" Margin="12,0,12,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*" MinWidth="380" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="2*" MinWidth="300" />
             </Grid.ColumnDefinitions>
 
-            <ListView x:Name="FileList" Grid.Column="0"
-                      ItemsSource="{Binding Files}"
-                      SelectedItem="{Binding SelectedFile}"
-                      SelectionMode="Extended"
-                      Background="#25262E" Foreground="#E8E8EC" BorderBrush="#4A4C58"
-                      KeyDown="FileList_KeyDown"
-                      MouseDoubleClick="FileList_MouseDoubleClick"
-                      SizeChanged="FileList_SizeChanged"
-                      VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListView.View>
-                    <GridView>
-                        <!-- Thumbnail (not sortable) -->
-                        <GridViewColumn x:Name="IconColumn" Width="44">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Border Width="32" Height="32" Background="#1B1C22" CornerRadius="4">
-                                        <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="2" />
-                                    </Border>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
+            <Border Grid.Column="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="4">
+                <ListView x:Name="FileList"
+                          ItemsSource="{Binding Files}"
+                          SelectedItem="{Binding SelectedFile}"
+                          SelectionMode="Extended"
+                          Background="Transparent" BorderThickness="0"
+                          KeyDown="FileList_KeyDown"
+                          MouseDoubleClick="FileList_MouseDoubleClick"
+                          SizeChanged="FileList_SizeChanged"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListView.View>
+                        <GridView>
+                            <!-- Thumbnail (not sortable) -->
+                            <GridViewColumn x:Name="IconColumn" Width="44">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Width="32" Height="32" CornerRadius="4"
+                                                Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                            <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="2" />
+                                        </Border>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
 
-                        <GridViewColumn x:Name="NameColumn" Width="360">
-                            <GridViewColumn.Header>
-                                <GridViewColumnHeader x:Name="HdrName" Content="Name" Tag="Name"
-                                                      Click="ColumnHeader_Click" />
-                            </GridViewColumn.Header>
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" FontSize="14"
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
+                            <GridViewColumn x:Name="NameColumn" Width="360">
+                                <GridViewColumn.Header>
+                                    <GridViewColumnHeader x:Name="HdrName" Content="Name" Tag="Name"
+                                                          Click="ColumnHeader_Click" />
+                                </GridViewColumn.Header>
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" FontSize="14"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
 
-                        <GridViewColumn x:Name="DateColumn" Width="140">
-                            <GridViewColumn.Header>
-                                <GridViewColumnHeader x:Name="HdrDate" Content="Date modified" Tag="Date"
-                                                      Click="ColumnHeader_Click" />
-                            </GridViewColumn.Header>
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding ModifiedDisplay}" FontSize="12"
-                                               Foreground="#C7C9D1" VerticalAlignment="Center" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
+                            <GridViewColumn x:Name="DateColumn" Width="140">
+                                <GridViewColumn.Header>
+                                    <GridViewColumnHeader x:Name="HdrDate" Content="Date modified" Tag="Date"
+                                                          Click="ColumnHeader_Click" />
+                                </GridViewColumn.Header>
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding ModifiedDisplay}" FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
 
-                        <GridViewColumn x:Name="TypeColumn" Width="80">
-                            <GridViewColumn.Header>
-                                <GridViewColumnHeader x:Name="HdrType" Content="Type" Tag="Type"
-                                                      Click="ColumnHeader_Click" />
-                            </GridViewColumn.Header>
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding TypeDisplay}" FontSize="12"
-                                               Foreground="#C7C9D1" VerticalAlignment="Center" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
+                            <GridViewColumn x:Name="TypeColumn" Width="80">
+                                <GridViewColumn.Header>
+                                    <GridViewColumnHeader x:Name="HdrType" Content="Type" Tag="Type"
+                                                          Click="ColumnHeader_Click" />
+                                </GridViewColumn.Header>
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding TypeDisplay}" FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
 
-                        <GridViewColumn x:Name="SizeColumn" Width="90">
-                            <GridViewColumn.Header>
-                                <GridViewColumnHeader x:Name="HdrSize" Content="Size" Tag="Size"
-                                                      Click="ColumnHeader_Click"
-                                                      HorizontalContentAlignment="Right" />
-                            </GridViewColumn.Header>
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding SizeDisplay}" FontSize="12"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                    </GridView>
-                </ListView.View>
-            </ListView>
+                            <GridViewColumn x:Name="SizeColumn" Width="90">
+                                <GridViewColumn.Header>
+                                    <GridViewColumnHeader x:Name="HdrSize" Content="Size" Tag="Size"
+                                                          Click="ColumnHeader_Click"
+                                                          HorizontalContentAlignment="Right" />
+                                </GridViewColumn.Header>
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding SizeDisplay}" FontSize="12"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Border>
 
-            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           Background="Transparent" />
 
             <!-- Preview pane + quick-rename bar -->
@@ -179,10 +249,13 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Background="#25262E" BorderBrush="#4A4C58" BorderThickness="1" CornerRadius="4">
+                <Border Grid.Row="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="8">
                     <Grid>
                         <TextBlock x:Name="PreviewPlaceholder" Text="Select a file to preview it"
-                                   Foreground="#9DA0AC" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Image x:Name="PreviewImage" Stretch="Uniform" Margin="8" Visibility="Collapsed" />
                         <MediaElement x:Name="PreviewMedia" LoadedBehavior="Manual" Stretch="Uniform" Margin="8"
                                       Visibility="Collapsed" MediaEnded="PreviewMedia_MediaEnded" />
@@ -192,27 +265,32 @@
                             <Image x:Name="PreviewInfoThumb" Width="128" Height="128" Stretch="Uniform" />
                             <TextBlock x:Name="PreviewInfoName" FontSize="15" Margin="0,12,0,2"
                                        HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" />
-                            <TextBlock x:Name="PreviewInfoDetail" FontSize="12" Foreground="#9DA0AC"
+                            <TextBlock x:Name="PreviewInfoDetail" FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        HorizontalAlignment="Center" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <!-- Quick rename: type a name, Enter renames + advances to the next file -->
-                <Border x:Name="QuickRenamePanel" Grid.Row="1" Margin="0,8,0,0" Padding="10"
-                        Background="#25262E" BorderBrush="#4A4C58" BorderThickness="1" CornerRadius="4"
+                <Border x:Name="QuickRenamePanel" Grid.Row="1" Margin="0,10,0,0" Padding="12"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="8"
                         IsEnabled="False">
                     <StackPanel>
-                        <TextBlock Text="Quick rename" FontSize="11" Foreground="#9DA0AC" Margin="0,0,0,5" />
+                        <TextBlock Text="QUICK RENAME" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
                         <DockPanel LastChildFill="True">
                             <TextBlock x:Name="RenameExtLabel" DockPanel.Dock="Right" VerticalAlignment="Center"
-                                       Foreground="#9DA0AC" FontSize="13" Margin="6,0,0,0" />
-                            <TextBox x:Name="RenameBox" Padding="6,4" FontSize="14"
-                                     Background="#2A2C34" Foreground="#E8E8EC" BorderBrush="#4A4C58"
-                                     KeyDown="RenameBox_KeyDown"
-                                     ToolTip="Type a name and press Enter — collisions auto-number (Clip, Clip 2, …). Esc returns to the list." />
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       FontSize="13" Margin="8,0,0,0" />
+                            <ui:TextBox x:Name="RenameBox" FontSize="14"
+                                        PlaceholderText="Name this file…"
+                                        KeyDown="RenameBox_KeyDown"
+                                        ToolTip="Type a name and press Enter — collisions auto-number (Clip, Clip 2, …). Esc returns to the list." />
                         </DockPanel>
-                        <ItemsControl x:Name="Palette" ItemsSource="{Binding RecentNames}" Margin="0,7,0,0">
+                        <ItemsControl x:Name="Palette" ItemsSource="{Binding RecentNames}" Margin="0,8,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -220,10 +298,9 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Content="{Binding}" Click="PaletteChip_Click"
-                                            Margin="0,0,5,5" Padding="9,3"
-                                            Background="#33353F" Foreground="#E8E8EC" BorderBrush="#4A4C58"
-                                            ToolTip="Stage this name — press Enter to apply" />
+                                    <ui:Button Content="{Binding}" Click="PaletteChip_Click"
+                                               Margin="0,0,6,6" Padding="10,4" FontSize="12"
+                                               ToolTip="Stage this name — press Enter to apply" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -233,10 +310,11 @@
         </Grid>
 
         <!-- Status bar -->
-        <DockPanel Grid.Row="2" Margin="10,6,10,8">
+        <DockPanel Grid.Row="3" Margin="14,8,14,10">
             <TextBlock DockPanel.Dock="Right" Text="Del = Recycle Bin · F2 = Rename · Enter = Open"
-                       Foreground="#9DA0AC" FontSize="11" />
-            <TextBlock Text="{Binding StatusText}" FontSize="12" />
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="11" />
+            <TextBlock Text="{Binding StatusText}" FontSize="12"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         </DockPanel>
     </Grid>
-</Window>
+</ui:FluentWindow>

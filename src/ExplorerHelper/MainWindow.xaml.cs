@@ -11,7 +11,9 @@ using ExplorerHelper.ViewModels;
 
 namespace ExplorerHelper;
 
-public partial class MainWindow : Window
+// FluentWindow is fully qualified so the broad Wpf.Ui.Controls namespace doesn't collide
+// with System.Windows types used below (MessageBox, Button, …).
+public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 {
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico", ".tif", ".tiff"];
     private static readonly string[] VideoExtensions = [".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm", ".m4v"];
