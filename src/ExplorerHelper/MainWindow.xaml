@@ -98,9 +98,31 @@
 
         <!-- Toolbar -->
         <DockPanel Grid.Row="1" Margin="12,4,12,10" LastChildFill="True">
-            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
-                       Content="{Binding ContextMenuButtonText}"
-                       Command="{Binding ToggleContextMenuCommand}" />
+            <ToggleButton x:Name="SettingsButton" DockPanel.Dock="Right" Margin="6,0,0,0"
+                          ToolTip="Settings">
+                <ui:SymbolIcon Symbol="Settings24" />
+            </ToggleButton>
+            <Popup PlacementTarget="{Binding ElementName=SettingsButton}" Placement="Bottom"
+                   StaysOpen="False" AllowsTransparency="True"
+                   IsOpen="{Binding IsChecked, ElementName=SettingsButton, Mode=TwoWay}">
+                <Border Background="{DynamicResource ApplicationBackgroundBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,6,0,0"
+                        MaxWidth="300">
+                    <StackPanel>
+                        <TextBlock Text="Explorer integration" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,0,0,8" />
+                        <ui:Button Content="{Binding ContextMenuButtonText}"
+                                   Command="{Binding ToggleContextMenuCommand}"
+                                   HorizontalAlignment="Stretch"
+                                   ToolTip="Adds or removes Explorer Helper's &quot;Clean this folder&quot; entry in the right-click menu for your user (no admin needed). On Windows 11 it appears under &quot;Show more options.&quot;" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Registers the &quot;Clean this folder&quot; right-click entry for folders. Per-user, no admin required; Remove deletes it again." />
+                    </StackPanel>
+                </Border>
+            </Popup>
             <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
                        Content="Open in Explorer" Icon="{ui:SymbolIcon Open24}"
                        Command="{Binding OpenInExplorerCommand}" />
