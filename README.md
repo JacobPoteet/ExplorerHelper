@@ -21,6 +21,7 @@ and triage its contents with previews and keyboard shortcuts.
 - **Keyboard triage** — `Del` sends to the Recycle Bin (never permanent deletion), `F2` renames, `Enter` opens
 - **Undo** — `Ctrl`+`Z` reverses the last rename, delete, or triage commit; deleted files come straight back out of the Recycle Bin
 - **Quick rename** — review files one by one and name them fast: type a name, press `Enter` to rename and jump to the next file. Collisions auto-number (`Clip`, `Clip 2`, `Clip 3`…), the extension is preserved, and a session name palette re-applies recent names in a click — built for triaging a folder of clips or screenshots
+- **Quick-use buttons** — build a name in one click from your own preset buttons (add them from the `+` under the rename box, manage them in **Settings**), plus two dynamic date buttons that insert today's date or the selected file's created date. The date formats are configurable in Settings using standard .NET date/time patterns (`yyyy-MM-dd`, `hh:mm tt`, …); the button row scrolls horizontally when it fills up
 - **Filter & sort** by name, size, date, or type — folders always listed first
 - Multi-select delete, open in Explorer, one-click context-menu install/uninstall from inside the app
 

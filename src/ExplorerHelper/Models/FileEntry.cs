@@ -12,6 +12,9 @@ public partial class FileEntry : ObservableObject
     public long SizeBytes { get; }
     public DateTime Modified { get; }
 
+    /// <summary>When the file/folder was created — used by the dynamic "created date" quick button.</summary>
+    public DateTime Created { get; }
+
     [ObservableProperty]
     private string _name;
 
@@ -30,6 +33,7 @@ public partial class FileEntry : ObservableObject
         Extension = IsDirectory ? "Folder" : info.Extension.TrimStart('.').ToUpperInvariant();
         SizeBytes = info is FileInfo file ? file.Length : 0;
         Modified = info.LastWriteTime;
+        Created = info.CreationTime;
     }
 
     /// <summary>

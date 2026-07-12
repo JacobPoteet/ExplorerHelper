@@ -17,6 +17,96 @@ public partial class MainViewModel : ObservableObject
 
     private const int MaxRecentNames = 12;
 
+    // --- Quick-name preset buttons (issue #14) ----------------------------------------
+    // Persisted preset strings the user can drop into the rename box in one click, plus the
+    // two date formats used by the dynamic "today" / "created" buttons. All live in AppSettings.
+
+    private readonly AppSettings _settings;
+
+    /// <summary>User-defined preset strings shown as one-click buttons under the rename box.</summary>
+    public ObservableCollection<string> QuickNameButtons { get; } = [];
+
+    /// <summary>.NET custom date format for the "today's date" dynamic button.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TodayFormatPreview))]
+    private string _todayDateFormat = "yyyy-MM-dd";
+
+    /// <summary>.NET custom date format for the "file created date" dynamic button.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CreatedFormatPreview))]
+    private string _createdDateFormat = "yyyy-MM-dd";
+
+    /// <summary>Live sample of the today-date format, shown next to the settings field.</summary>
+    public string TodayFormatPreview => FormatDate(DateTime.Now, TodayDateFormat);
+
+    /// <summary>Live sample of the created-date format (uses now as the sample date).</summary>
+    public string CreatedFormatPreview => FormatDate(DateTime.Now, CreatedDateFormat);
+
+    public MainViewModel()
+    {
+        _settings = AppSettings.Load();
+        foreach (var name in _settings.QuickNameButtons)
+            QuickNameButtons.Add(name);
+        TodayDateFormat = _settings.TodayDateFormat;
+        CreatedDateFormat = _settings.CreatedDateFormat;
+    }
+
+    partial void OnTodayDateFormatChanged(string value)
+    {
+        _settings.TodayDateFormat = value;
+        _settings.Save();
+    }
+
+    partial void OnCreatedDateFormatChanged(string value)
+    {
+        _settings.CreatedDateFormat = value;
+        _settings.Save();
+    }
+
+    /// <summary>Adds a preset button (trimmed, case-insensitive de-dupe) and persists it.</summary>
+    public void AddQuickButton(string text)
+    {
+        text = text.Trim();
+        if (string.IsNullOrEmpty(text))
+            return;
+        if (QuickNameButtons.Any(b => string.Equals(b, text, StringComparison.OrdinalIgnoreCase)))
+            return;
+        QuickNameButtons.Add(text);
+        PersistQuickButtons();
+    }
+
+    /// <summary>Removes a preset button and persists the change.</summary>
+    public void RemoveQuickButton(string text)
+    {
+        if (QuickNameButtons.Remove(text))
+            PersistQuickButtons();
+    }
+
+    private void PersistQuickButtons()
+    {
+        _settings.QuickNameButtons = [.. QuickNameButtons];
+        _settings.Save();
+    }
+
+    /// <summary>
+    /// Formats a date with a user-supplied .NET custom format string, degrading gracefully:
+    /// an invalid format never throws — it just falls back to a sensible default so a typo in
+    /// settings can't crash the rename bar.
+    /// </summary>
+    public static string FormatDate(DateTime date, string? format)
+    {
+        if (string.IsNullOrWhiteSpace(format))
+            return date.ToString("yyyy-MM-dd");
+        try
+        {
+            return date.ToString(format);
+        }
+        catch (FormatException)
+        {
+            return date.ToString("yyyy-MM-dd");
+        }
+    }
+
     /// <summary>The distinct file types present in the folder, each toggleable on/off (issue #5).</summary>
     public ObservableCollection<TypeFilter> TypeFilters { get; } = [];
 

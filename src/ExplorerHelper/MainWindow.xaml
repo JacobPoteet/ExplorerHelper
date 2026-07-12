@@ -108,7 +108,7 @@
                 <Border Background="{DynamicResource ApplicationBackgroundBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,6,0,0"
-                        MaxWidth="300">
+                        MaxWidth="320">
                     <StackPanel>
                         <TextBlock Text="Explorer integration" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -120,6 +120,63 @@
                         <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                    Text="Registers the &quot;Clean this folder&quot; right-click entry for folders. Per-user, no admin required; Remove deletes it again." />
+
+                        <Separator Margin="0,12" />
+
+                        <!-- Quick-use buttons (issue #14): manage the presets and the date formats
+                             used by the dynamic "today" / "created" buttons. -->
+                        <TextBlock Text="Quick rename buttons" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,0,0,8" />
+                        <ItemsControl ItemsSource="{Binding QuickNameButtons}">
+                            <ItemsControl.Template>
+                                <ControlTemplate TargetType="ItemsControl">
+                                    <StackPanel>
+                                        <TextBlock Text="No preset buttons yet — add one from the + under the rename box."
+                                                   TextWrapping="Wrap" FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Visibility="{Binding HasItems, RelativeSource={RelativeSource TemplatedParent},
+                                                                Converter={StaticResource InverseBoolToVisibility}}" />
+                                        <ItemsPresenter />
+                                    </StackPanel>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,0,0,4" LastChildFill="True">
+                                        <ui:Button DockPanel.Dock="Right" Padding="6,2" Margin="6,0,0,0"
+                                                   Icon="{ui:SymbolIcon Delete24}" Click="RemoveQuickButton_Click"
+                                                   Tag="{Binding}" ToolTip="Remove this button" />
+                                        <Border Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                                CornerRadius="4" Padding="8,3">
+                                            <TextBlock Text="{Binding}" FontSize="13" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </Border>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="Date formats" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,12,0,4" />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,6"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Standard .NET date/time format (e.g. yyyy-MM-dd, hh:mm tt, MMM d)." />
+                        <TextBlock Text="Today's date" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <ui:TextBox FontSize="13" Margin="0,2,0,2"
+                                    Text="{Binding TodayDateFormat, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="{Binding TodayFormatPreview, StringFormat=Preview: {0}}"
+                                   FontSize="11" Margin="0,0,0,8"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Text="File created date" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <ui:TextBox FontSize="13" Margin="0,2,0,2"
+                                    Text="{Binding CreatedDateFormat, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="{Binding CreatedFormatPreview, StringFormat=Preview: {0}}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                     </StackPanel>
                 </Border>
             </Popup>
@@ -329,6 +386,64 @@
                                         KeyDown="RenameBox_KeyDown"
                                         ToolTip="Type a name and press Enter — collisions auto-number (Clip, Clip 2, …). Esc returns to the list." />
                         </DockPanel>
+                        <!-- Quick-use buttons (issue #14): one click drops a preset — or a live date —
+                             into the box. Scrolls horizontally so any number of buttons fits; the "+"
+                             on the far right adds a new one. Dynamic date buttons are styled apart. -->
+                        <DockPanel Margin="0,8,0,0" LastChildFill="True">
+                            <ToggleButton x:Name="AddButtonToggle" DockPanel.Dock="Right"
+                                          Margin="6,0,0,0" Padding="8,4"
+                                          ToolTip="Add a quick-use button">
+                                <ui:SymbolIcon Symbol="Add24" FontSize="14" />
+                            </ToggleButton>
+                            <Popup PlacementTarget="{Binding ElementName=AddButtonToggle}" Placement="Top"
+                                   StaysOpen="False" AllowsTransparency="True"
+                                   IsOpen="{Binding IsChecked, ElementName=AddButtonToggle, Mode=TwoWay}">
+                                <Border Background="{DynamicResource ApplicationBackgroundBrush}"
+                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:TextBox x:Name="NewButtonBox" Width="160" FontSize="13"
+                                                    PlaceholderText="Button text…"
+                                                    KeyDown="NewButtonBox_KeyDown" />
+                                        <ui:Button Content="Add" Appearance="Primary" Margin="6,0,0,0"
+                                                   Click="AddQuickButton_Click" />
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Dynamic buttons: distinct (accent) look — they insert a live date. -->
+                                    <ui:Button x:Name="TodayButton" Appearance="Primary"
+                                               Icon="{ui:SymbolIcon CalendarLtr24}"
+                                               Click="TodayButton_Click"
+                                               Margin="0,0,6,0" Padding="10,4" FontSize="12"
+                                               ToolTip="Insert today's date (format set in Settings)" />
+                                    <ui:Button x:Name="CreatedButton" Appearance="Primary"
+                                               Icon="{ui:SymbolIcon CalendarClock24}"
+                                               Click="CreatedButton_Click"
+                                               Margin="0,0,6,0" Padding="10,4" FontSize="12"
+                                               ToolTip="Insert the selected file's created date (format set in Settings)" />
+                                    <!-- Static presets -->
+                                    <ItemsControl ItemsSource="{Binding QuickNameButtons}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <ui:Button Content="{Binding}" Click="QuickButton_Click"
+                                                           Margin="0,0,6,0" Padding="10,4" FontSize="12"
+                                                           ToolTip="Insert this text into the name" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+
+                        <!-- Session name palette: recent names, click to re-apply (replaces the box). -->
                         <ItemsControl x:Name="Palette" ItemsSource="{Binding RecentNames}" Margin="0,8,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
