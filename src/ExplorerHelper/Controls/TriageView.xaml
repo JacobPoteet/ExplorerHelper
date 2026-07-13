@@ -76,7 +76,7 @@
             <Grid Grid.Row="1" Margin="24,4">
                 <!-- Static peek at the next card, behind the live one (deliberately not a
                      second PreviewPane — one live video/PDF handle at a time is enough). -->
-                <Border x:Name="NextCardHint" Margin="88,32,88,0" MaxWidth="860" Opacity="0.12"
+                <Border x:Name="NextCardHint" Margin="56,32,56,0" Opacity="0.12"
                         Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="12">
@@ -85,7 +85,7 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
 
-                <Border x:Name="Card" Margin="56,12" MaxWidth="920"
+                <Border x:Name="Card" Margin="24,12"
                         Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="12"
@@ -110,32 +110,40 @@
                         <Border Grid.Row="1" Padding="16,10"
                                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="0,1,0,0">
-                            <StackPanel>
+                            <StackPanel MaxWidth="720" HorizontalAlignment="Center">
                                 <TextBlock x:Name="CardName" FontSize="16" FontWeight="SemiBold"
+                                           TextAlignment="Center"
                                            TextTrimming="CharacterEllipsis" />
                                 <TextBlock x:Name="CardDetail" FontSize="12" Margin="0,2,0,0"
+                                           TextAlignment="Center"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
 
                         <!-- Dating-app stamps: fade in as the card is dragged -->
-                        <Border x:Name="KeepStamp" Grid.Row="0" Opacity="0" Margin="28"
+                        <Border x:Name="KeepStamp" Grid.Row="0" Opacity="0" Margin="96,72,0,0"
                                 HorizontalAlignment="Left" VerticalAlignment="Top"
-                                BorderBrush="#34C759" BorderThickness="3" CornerRadius="6"
-                                Padding="12,4" RenderTransformOrigin="0.5,0.5">
+                                BorderBrush="#34C759" BorderThickness="6" CornerRadius="10"
+                                Padding="22,8" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
-                                <RotateTransform Angle="-14" />
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="KeepStampScale" />
+                                    <RotateTransform Angle="-14" />
+                                </TransformGroup>
                             </Border.RenderTransform>
-                            <TextBlock Text="KEEP" Foreground="#34C759" FontSize="28" FontWeight="Bold" />
+                            <TextBlock Text="KEEP" Foreground="#34C759" FontSize="60" FontWeight="Bold" />
                         </Border>
-                        <Border x:Name="RejectStamp" Grid.Row="0" Opacity="0" Margin="28"
+                        <Border x:Name="RejectStamp" Grid.Row="0" Opacity="0" Margin="0,72,96,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
-                                BorderBrush="#FF3B30" BorderThickness="3" CornerRadius="6"
-                                Padding="12,4" RenderTransformOrigin="0.5,0.5">
+                                BorderBrush="#FF3B30" BorderThickness="6" CornerRadius="10"
+                                Padding="22,8" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
-                                <RotateTransform Angle="14" />
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="RejectStampScale" />
+                                    <RotateTransform Angle="14" />
+                                </TransformGroup>
                             </Border.RenderTransform>
-                            <TextBlock Text="REJECT" Foreground="#FF3B30" FontSize="28" FontWeight="Bold" />
+                            <TextBlock Text="REJECT" Foreground="#FF3B30" FontSize="60" FontWeight="Bold" />
                         </Border>
                     </Grid>
                 </Border>

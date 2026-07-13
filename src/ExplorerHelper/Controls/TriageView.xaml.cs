@@ -147,16 +147,29 @@ public partial class TriageView : UserControl
             return;
         }
 
-        // Fly the card off screen, then mark and advance.
+        // Slam the stamp on, let it linger for a beat, then fly the card off screen and
+        // mark/advance. The hold gives the stamp visual impact before the card leaves.
         _animating = true;
         var direction = flag == TriageFlag.Keep ? 1 : -1;
         var stamp = flag == TriageFlag.Keep ? KeepStamp : RejectStamp;
+        var stampScale = flag == TriageFlag.Keep ? KeepStampScale : RejectStampScale;
         stamp.Opacity = 1;
 
+        // Overshoot-and-settle "pop" so the stamp punches in rather than just appearing.
+        var pop = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(200))
+        {
+            From = 1.6,
+            EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.7 },
+        };
+        stampScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, pop);
+        stampScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, pop);
+
+        var hold = TimeSpan.FromMilliseconds(160);
         var distance = Math.Max(ActualWidth, 800);
         var duration = TimeSpan.FromMilliseconds(180);
         var slide = new DoubleAnimation(direction * distance, duration)
         {
+            BeginTime = hold,
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn },
         };
         slide.Completed += (_, _) =>
@@ -166,8 +179,8 @@ public partial class TriageView : UserControl
             Advance();
         };
         CardRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty,
-            new DoubleAnimation(direction * 24, duration));
-        Card.BeginAnimation(OpacityProperty, new DoubleAnimation(0, duration));
+            new DoubleAnimation(direction * 24, duration) { BeginTime = hold });
+        Card.BeginAnimation(OpacityProperty, new DoubleAnimation(0, duration) { BeginTime = hold });
         CardTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slide);
     }
 
@@ -201,6 +214,10 @@ public partial class TriageView : UserControl
         CardTranslate.Y = 0;
         CardRotate.Angle = 0;
         Card.Opacity = 1;
+        KeepStampScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+        KeepStampScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+        RejectStampScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+        RejectStampScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
         KeepStamp.Opacity = 0;
         RejectStamp.Opacity = 0;
     }
