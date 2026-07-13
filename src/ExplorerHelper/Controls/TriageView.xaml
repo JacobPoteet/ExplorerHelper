@@ -164,14 +164,14 @@
                                VerticalAlignment="Center" Click="Rewind_Click"
                                ToolTip="Rewind — back up one card and clear its mark (Backspace)" />
                     <ui:Button Content="✗" Width="68" Height="68" CornerRadius="34" FontSize="26"
-                               Margin="20,0" Foreground="#FF3B30" FontWeight="Bold"
+                               Margin="20,0,0,0" Foreground="#FF3B30" FontWeight="Bold"
                                Click="Reject_Click" ToolTip="Reject (←) — recycled when you commit" />
-                    <ui:Button Content="↓" Width="48" Height="48" CornerRadius="24" FontSize="18"
-                               VerticalAlignment="Center" Click="Skip_Click"
-                               ToolTip="Skip for now (↓) — decide later" />
                     <ui:Button Content="✓" Width="68" Height="68" CornerRadius="34" FontSize="26"
-                               Margin="20,0" Foreground="#34C759" FontWeight="Bold"
+                               Margin="20,0,0,0" Foreground="#34C759" FontWeight="Bold"
                                Click="Keep_Click" ToolTip="Keep (→)" />
+                    <ui:Button Content="⏭" Width="48" Height="48" CornerRadius="24" FontSize="18"
+                               Margin="20,0,0,0" VerticalAlignment="Center" Click="Skip_Click"
+                               ToolTip="Skip for now (↓) — decide later" />
                 </StackPanel>
                 <TextBlock Text="← reject · → keep · ↓ skip · Backspace rewind · Enter open · Esc exit"
                            HorizontalAlignment="Center" Margin="0,8,0,0" FontSize="11"
