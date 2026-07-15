@@ -14,16 +14,23 @@ public partial class CommitDialog : Window
     /// <summary>Remembered across commits within this app run.</summary>
     private static string? _lastDestination;
 
-    /// <summary>The folder keepers should move to, or null to leave them in place.</summary>
+    /// <summary>The folder keepers should move (or copy) to, or null to leave them in place.</summary>
     public string? KeepDestination { get; private set; }
+
+    /// <summary>True to copy kept files to <see cref="KeepDestination"/> instead of moving them.</summary>
+    public bool CopyKeepers { get; private set; }
+
+    /// <summary>True to send rejected files to the Recycle Bin; false to leave them in place.</summary>
+    public bool DeleteRejects { get; private set; }
 
     public CommitDialog(int rejectCount, long rejectBytes, int keepCount, long keepBytes)
     {
         InitializeComponent();
 
         RejectLine.Text = rejectCount == 0
-            ? "✗ Nothing to recycle."
-            : $"✗ Recycle {rejectCount} file(s) ({FileEntry.FormatSize(rejectBytes)}) → Recycle Bin";
+            ? "✗ Nothing flagged reject."
+            : $"✗ {rejectCount} file(s) flagged reject ({FileEntry.FormatSize(rejectBytes)})";
+        DeletePanel.Visibility = rejectCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         KeepLine.Text = keepCount == 0
             ? "✓ Nothing flagged keep."
             : $"✓ Keep {keepCount} file(s) ({FileEntry.FormatSize(keepBytes)})";
@@ -37,6 +44,8 @@ public partial class CommitDialog : Window
         var enabled = MoveCheck.IsChecked == true;
         DestBox.IsEnabled = enabled;
         BrowseButton.IsEnabled = enabled;
+        MoveRadio.IsEnabled = enabled;
+        CopyRadio.IsEnabled = enabled;
     }
 
     private void Browse_Click(object sender, RoutedEventArgs e)
@@ -52,16 +61,19 @@ public partial class CommitDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
+        DeleteRejects = DeletePanel.Visibility != Visibility.Visible || DeleteRejectsCheck.IsChecked == true;
+
         if (MoveCheck.IsChecked == true)
         {
             var dest = DestBox.Text.Trim();
             if (!Directory.Exists(dest))
             {
-                MessageBox.Show(this, "Pick an existing folder to move the kept files to.",
+                MessageBox.Show(this, "Pick an existing folder to move or copy the kept files to.",
                     "Commit triage", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             KeepDestination = dest;
+            CopyKeepers = CopyRadio.IsChecked == true;
             _lastDestination = dest;
         }
         DialogResult = true;

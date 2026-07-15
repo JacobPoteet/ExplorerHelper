@@ -351,7 +351,7 @@ public partial class TriageView : UserControl
         UnmarkedStrip.Visibility = _vm.UnmarkedFileCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         UnmarkedText.Text = $"{_vm.UnmarkedFileCount} file(s) not decided yet — they stay untouched unless you keep going.";
         CommitButton.IsEnabled = _vm.KeepCount + _vm.RejectCount > 0;
-        CommitButton.Content = $"Commit  (✗ {_vm.RejectCount} recycle · ✓ {_vm.KeepCount} keep)…";
+        CommitButton.Content = $"Commit  (✗ {_vm.RejectCount} reject · ✓ {_vm.KeepCount} keep)…";
     }
 
     private static FileEntry? EntryOf(object sender) =>
@@ -394,13 +394,15 @@ public partial class TriageView : UserControl
         if (dialog.ShowDialog() != true)
             return;
         var destination = dialog.KeepDestination;
+        var copyKeepers = dialog.CopyKeepers;
+        var deleteRejects = dialog.DeleteRejects;
 
         // Release every preview handle, then let the dispatcher pump the media teardown
         // before files start moving — same discipline as delete/rename (issue #1).
         CardPreview.Clear();
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
         {
-            var error = _vm.CommitTriage(destination);
+            var error = _vm.CommitTriage(destination, copyKeepers, deleteRejects);
             if (error is not null)
                 MessageBox.Show(Window.GetWindow(this)!, error, "Commit finished with errors",
                     MessageBoxButton.OK, MessageBoxImage.Warning);

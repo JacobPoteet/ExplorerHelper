@@ -466,7 +466,7 @@ public partial class MainViewModel : ObservableObject
     /// auto-number). Pushes a single undo entry that reverses the whole commit. Returns an
     /// error summary, or null when every file was processed.
     /// </summary>
-    public string? CommitTriage(string? keepDestination)
+    public string? CommitTriage(string? keepDestination, bool copyKeepers, bool deleteRejects)
     {
         var rejects = _allEntries.Where(e => !e.IsDirectory && e.Flag == TriageFlag.Reject).ToList();
         var keeps = _allEntries.Where(e => !e.IsDirectory && e.Flag == TriageFlag.Keep).ToList();
@@ -474,16 +474,20 @@ public partial class MainViewModel : ObservableObject
         var failures = 0;
 
         var recycled = new List<(string Original, string Recycled)>();
-        foreach (var entry in rejects)
+        if (deleteRejects)
         {
-            var binPath = RecycleBinService.MoveToRecycleBin(entry.FullPath);
-            if (binPath is not null)
-                recycled.Add((entry.FullPath, binPath));
-            else
-                failures++;
+            foreach (var entry in rejects)
+            {
+                var binPath = RecycleBinService.MoveToRecycleBin(entry.FullPath);
+                if (binPath is not null)
+                    recycled.Add((entry.FullPath, binPath));
+                else
+                    failures++;
+            }
         }
 
         var moved = new List<(string From, string To)>();
+        var copied = new List<string>();
         if (!string.IsNullOrWhiteSpace(keepDestination))
         {
             foreach (var entry in keeps)
@@ -496,8 +500,16 @@ public partial class MainViewModel : ObservableObject
                     continue; // destination is the folder it's already in
                 try
                 {
-                    File.Move(entry.FullPath, target); // handles cross-volume (SD card → disk)
-                    moved.Add((entry.FullPath, target));
+                    if (copyKeepers)
+                    {
+                        File.Copy(entry.FullPath, target);
+                        copied.Add(target);
+                    }
+                    else
+                    {
+                        File.Move(entry.FullPath, target); // handles cross-volume (SD card → disk)
+                        moved.Add((entry.FullPath, target));
+                    }
                 }
                 catch
                 {
@@ -506,12 +518,14 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
-        if (recycled.Count > 0 || moved.Count > 0)
+        if (recycled.Count > 0 || moved.Count > 0 || copied.Count > 0)
         {
-            var label = moved.Count > 0
-                ? $"triage commit ({recycled.Count} recycled, {moved.Count} moved)"
-                : $"triage commit ({recycled.Count} recycled)";
-            PushUndo(label, () => ReverseCommit(moved, recycled));
+            var parts = new List<string>();
+            if (recycled.Count > 0) parts.Add($"{recycled.Count} recycled");
+            if (moved.Count > 0) parts.Add($"{moved.Count} moved");
+            if (copied.Count > 0) parts.Add($"{copied.Count} copied");
+            var label = $"triage commit ({string.Join(", ", parts)})";
+            PushUndo(label, () => ReverseCommit(moved, recycled, copied));
         }
 
         // The session is done — clear every flag before the reload so none carry over.
@@ -519,25 +533,42 @@ public partial class MainViewModel : ObservableObject
             entry.Flag = TriageFlag.None;
         LoadFolder(FolderPath);
 
-        var summary = $"Triage committed — {recycled.Count} recycled"
-            + (moved.Count > 0 ? $", {moved.Count} moved" : $", {keeps.Count} kept in place");
+        var summaryParts = new List<string>();
+        summaryParts.Add(deleteRejects ? $"{recycled.Count} recycled" : $"{rejects.Count} rejected files left in place");
+        if (moved.Count > 0) summaryParts.Add($"{moved.Count} moved");
+        if (copied.Count > 0) summaryParts.Add($"{copied.Count} copied");
+        if (moved.Count == 0 && copied.Count == 0) summaryParts.Add($"{keeps.Count} kept in place");
+        var summary = "Triage committed — " + string.Join(", ", summaryParts);
         StatusText = failures == 0 ? summary : $"{summary} · {failures} failed";
         return failures == 0 ? null : $"{failures} file(s) could not be processed.";
     }
 
-    /// <summary>Reverses a whole triage commit: moves keepers back, restores recycled rejects.</summary>
+    /// <summary>Reverses a whole triage commit: moves keepers back, deletes copies, restores recycled rejects.</summary>
     private static string? ReverseCommit(
         IReadOnlyList<(string From, string To)> moved,
-        IReadOnlyList<(string Original, string Recycled)> recycled)
+        IReadOnlyList<(string Original, string Recycled)> recycled,
+        IReadOnlyList<string> copied)
     {
         var failed = 0;
         foreach (var (from, to) in moved)
             if (ReverseRename(to, from, isDirectory: false) is not null)
                 failed++;
+        foreach (var path in copied)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch
+            {
+                failed++;
+            }
+        }
         foreach (var (original, bin) in recycled)
             if (!RecycleBinService.Restore(bin, original))
                 failed++;
-        var total = moved.Count + recycled.Count;
+        var total = moved.Count + recycled.Count + copied.Count;
         return failed == 0 ? null : $"{failed} of {total} item(s) could not be restored.";
     }
 
