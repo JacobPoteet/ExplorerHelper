@@ -6,12 +6,22 @@
         Background="#1E1E24">
     <StackPanel Margin="16">
         <TextBlock x:Name="RejectLine" Foreground="#E8E8EC" FontSize="14" />
-        <TextBlock x:Name="KeepLine" Foreground="#E8E8EC" FontSize="14" Margin="0,6,0,0" />
+        <StackPanel x:Name="DeletePanel" Margin="0,6,0,0">
+            <CheckBox x:Name="DeleteRejectsCheck" Content="Send rejected files to the Recycle Bin"
+                      Foreground="#E8E8EC" IsChecked="True" />
+        </StackPanel>
+        <TextBlock x:Name="KeepLine" Foreground="#E8E8EC" FontSize="14" Margin="0,14,0,0" />
 
         <StackPanel x:Name="MovePanel" Margin="0,14,0,0">
-            <CheckBox x:Name="MoveCheck" Content="Move kept files to a folder"
+            <CheckBox x:Name="MoveCheck" Content="Move or copy kept files to a folder"
                       Foreground="#E8E8EC"
                       Checked="MoveCheck_Changed" Unchecked="MoveCheck_Changed" />
+            <StackPanel Orientation="Horizontal" Margin="22,8,0,0">
+                <RadioButton x:Name="MoveRadio" Content="Move" GroupName="MoveOrCopy"
+                             Foreground="#E8E8EC" IsChecked="True" IsEnabled="False" />
+                <RadioButton x:Name="CopyRadio" Content="Copy" GroupName="MoveOrCopy"
+                             Foreground="#E8E8EC" Margin="16,0,0,0" IsEnabled="False" />
+            </StackPanel>
             <DockPanel Margin="22,8,0,0">
                 <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Browse…"
                         Click="Browse_Click" Padding="12,4" Margin="8,0,0,0" IsEnabled="False"
