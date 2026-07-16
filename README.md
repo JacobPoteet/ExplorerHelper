@@ -3,10 +3,15 @@
 [![Download latest](https://img.shields.io/github/v/release/JacobPoteet/ExplorerHelper?label=download&sort=semver)](https://github.com/JacobPoteet/ExplorerHelper/releases/latest)
 [![CI](https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Project site](https://img.shields.io/badge/site-jacobpoteet.github.io-7C5CFC)](https://jacobpoteet.github.io/ExplorerHelper/)
 
 Clean and organize any folder straight from the Windows Explorer right-click menu.
 Right-click a folder (or the background of an open folder), hit **Clean this folder**,
 and triage its contents with previews and keyboard shortcuts.
+
+**🌐 [Visit the project site](https://jacobpoteet.github.io/ExplorerHelper/)** for a visual
+tour of the app — or jump straight to the
+[latest release](https://github.com/JacobPoteet/ExplorerHelper/releases/latest).
 
 ## Features
 
@@ -29,14 +34,12 @@ and triage its contents with previews and keyboard shortcuts.
 - **Quick rename** — review files one by one and name them fast: type a name, press `Enter` to rename and jump to the next file. Collisions auto-number (`Clip`, `Clip 2`, `Clip 3`…), the extension is preserved, and a session name palette re-applies recent names in a click — built for triaging a folder of clips or screenshots
 - **Quick-use buttons** — build a name in one click from your own preset buttons (add them from the `+` under the rename box, manage them in **Settings**), plus two dynamic date buttons that insert today's date or the selected file's created date. The date formats are configurable in Settings using standard .NET date/time patterns (`yyyy-MM-dd`, `hh:mm tt`, …); the button row scrolls horizontally when it fills up
 - **Filter & sort** by name, size, date, or type — folders always listed first
+- **Automatic updates** — the app checks GitHub for a newer release on startup (toggleable in
+  Settings); when one ships, an update button appears in the toolbar and one click installs it
+  and restarts the app right where you were
 - Multi-select delete, open in Explorer, one-click context-menu install/uninstall from inside the app
 
-### Roadmap
-
-- Duplicate finder (size prefilter + hash)
-- Sort into subfolders by extension/date rules
-- Empty-folder sweep and folder size breakdown
-- "Untouched for N months" age filter
+Planned work lives in the [issue tracker](https://github.com/JacobPoteet/ExplorerHelper/issues).
 
 ## Install
 
@@ -59,10 +62,10 @@ Requires the [.NET SDK](https://dotnet.microsoft.com/download) 8 or newer.
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip into artifacts/
-./build.ps1 -Version 0.1.0
+./build.ps1 -Version 0.4.0
 
 # Also compile the installer (requires Inno Setup 6: winget install JRSoftware.InnoSetup)
-./build.ps1 -Version 0.1.0 -Installer
+./build.ps1 -Version 0.4.0 -Installer
 ```
 
 ## Releasing
