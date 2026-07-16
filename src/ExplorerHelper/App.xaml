@@ -11,6 +11,18 @@
             </ResourceDictionary.MergedDictionaries>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+            <!-- Design tokens: the app's semantic palette. Keep (mint) / Reject (coral) replace
+                 the old iOS green/red; the accent tints match the violet applied in App.xaml.cs.
+                 Fill/Stroke variants are the same hue at low alpha for pill and chip surfaces. -->
+            <SolidColorBrush x:Key="KeepBrush" Color="#3DD68C" />
+            <SolidColorBrush x:Key="KeepFillBrush" Color="#263DD68C" />
+            <SolidColorBrush x:Key="KeepStrokeBrush" Color="#663DD68C" />
+            <SolidColorBrush x:Key="RejectBrush" Color="#FF5C7C" />
+            <SolidColorBrush x:Key="RejectFillBrush" Color="#26FF5C7C" />
+            <SolidColorBrush x:Key="RejectStrokeBrush" Color="#66FF5C7C" />
+            <SolidColorBrush x:Key="AccentTintBrush" Color="#2B7C5CFC" />
+            <SolidColorBrush x:Key="AccentTintStrongBrush" Color="#457C5CFC" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

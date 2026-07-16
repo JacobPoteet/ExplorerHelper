@@ -3,7 +3,7 @@ using System.Windows;
 
 namespace ExplorerHelper;
 
-public partial class RenameDialog : Window
+public partial class RenameDialog : Wpf.Ui.Controls.FluentWindow
 {
     public string NewName => NameBox.Text.Trim();
 

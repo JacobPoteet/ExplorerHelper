@@ -54,18 +54,24 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <ui:Button Click="Review_Click" ToolTip="Rejected so far — click to review" Padding="10,4">
+                    <ui:Button Click="Review_Click" ToolTip="Rejected so far — click to review"
+                               Padding="12,4" CornerRadius="14"
+                               Background="{StaticResource RejectFillBrush}"
+                               BorderBrush="{StaticResource RejectStrokeBrush}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="✗ " Foreground="#FF3B30" FontWeight="Bold" />
+                            <TextBlock Text="✗ " Foreground="{StaticResource RejectBrush}" FontWeight="Bold" />
                             <TextBlock Text="{Binding RejectCount}" />
                         </StackPanel>
                     </ui:Button>
                     <TextBlock Text="{Binding UnmarkedFileCount, StringFormat='{}{0} left'}"
                                VerticalAlignment="Center" Margin="14,0" FontSize="12"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    <ui:Button Click="Review_Click" ToolTip="Kept so far — click to review" Padding="10,4">
+                    <ui:Button Click="Review_Click" ToolTip="Kept so far — click to review"
+                               Padding="12,4" CornerRadius="14"
+                               Background="{StaticResource KeepFillBrush}"
+                               BorderBrush="{StaticResource KeepStrokeBrush}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="✓ " Foreground="#34C759" FontWeight="Bold" />
+                            <TextBlock Text="✓ " Foreground="{StaticResource KeepBrush}" FontWeight="Bold" />
                             <TextBlock Text="{Binding KeepCount}" />
                         </StackPanel>
                     </ui:Button>
@@ -88,7 +94,7 @@
                 <Border x:Name="Card" Margin="24,12"
                         Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1" CornerRadius="12"
+                        BorderThickness="1" CornerRadius="16"
                         RenderTransformOrigin="0.5,1"
                         MouseLeftButtonDown="Card_MouseLeftButtonDown"
                         MouseMove="Card_MouseMove"
@@ -123,7 +129,8 @@
                         <!-- Dating-app stamps: fade in as the card is dragged -->
                         <Border x:Name="KeepStamp" Grid.Row="0" Opacity="0" Margin="96,72,0,0"
                                 HorizontalAlignment="Left" VerticalAlignment="Top"
-                                BorderBrush="#34C759" BorderThickness="6" CornerRadius="10"
+                                BorderBrush="{StaticResource KeepBrush}" BorderThickness="6" CornerRadius="10"
+                                Background="{StaticResource KeepFillBrush}"
                                 Padding="22,8" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <TransformGroup>
@@ -131,11 +138,12 @@
                                     <RotateTransform Angle="-14" />
                                 </TransformGroup>
                             </Border.RenderTransform>
-                            <TextBlock Text="KEEP" Foreground="#34C759" FontSize="60" FontWeight="Bold" />
+                            <TextBlock Text="KEEP" Foreground="{StaticResource KeepBrush}" FontSize="60" FontWeight="Bold" />
                         </Border>
                         <Border x:Name="RejectStamp" Grid.Row="0" Opacity="0" Margin="0,72,96,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
-                                BorderBrush="#FF3B30" BorderThickness="6" CornerRadius="10"
+                                BorderBrush="{StaticResource RejectBrush}" BorderThickness="6" CornerRadius="10"
+                                Background="{StaticResource RejectFillBrush}"
                                 Padding="22,8" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <TransformGroup>
@@ -143,7 +151,7 @@
                                     <RotateTransform Angle="14" />
                                 </TransformGroup>
                             </Border.RenderTransform>
-                            <TextBlock Text="REJECT" Foreground="#FF3B30" FontSize="60" FontWeight="Bold" />
+                            <TextBlock Text="REJECT" Foreground="{StaticResource RejectBrush}" FontSize="60" FontWeight="Bold" />
                         </Border>
                     </Grid>
                 </Border>
@@ -151,6 +159,14 @@
                 <!-- Shown when the deck runs out -->
                 <StackPanel x:Name="DonePanel" Visibility="Collapsed"
                             HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Width="64" Height="64" CornerRadius="32" Margin="0,0,0,14"
+                            HorizontalAlignment="Center"
+                            Background="{StaticResource KeepFillBrush}"
+                            BorderBrush="{StaticResource KeepStrokeBrush}" BorderThickness="1">
+                        <TextBlock Text="✓" FontSize="30" FontWeight="Bold"
+                                   Foreground="{StaticResource KeepBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
                     <TextBlock Text="All caught up" FontSize="24" FontWeight="SemiBold"
                                HorizontalAlignment="Center" />
                     <TextBlock x:Name="DoneSummary" FontSize="13" Margin="0,8,0,18"
@@ -172,10 +188,16 @@
                                VerticalAlignment="Center" Click="Rewind_Click"
                                ToolTip="Rewind — back up one card and clear its mark (Backspace)" />
                     <ui:Button Content="✗" Width="68" Height="68" CornerRadius="34" FontSize="26"
-                               Margin="20,0,0,0" Foreground="#FF3B30" FontWeight="Bold"
+                               Margin="20,0,0,0" FontWeight="Bold"
+                               Foreground="{StaticResource RejectBrush}"
+                               Background="{StaticResource RejectFillBrush}"
+                               BorderBrush="{StaticResource RejectStrokeBrush}"
                                Click="Reject_Click" ToolTip="Reject (←) — recycled when you commit" />
                     <ui:Button Content="✓" Width="68" Height="68" CornerRadius="34" FontSize="26"
-                               Margin="20,0,0,0" Foreground="#34C759" FontWeight="Bold"
+                               Margin="20,0,0,0" FontWeight="Bold"
+                               Foreground="{StaticResource KeepBrush}"
+                               Background="{StaticResource KeepFillBrush}"
+                               BorderBrush="{StaticResource KeepStrokeBrush}"
                                Click="Keep_Click" ToolTip="Keep (→)" />
                     <ui:Button Content="⏭" Width="48" Height="48" CornerRadius="24" FontSize="18"
                                Margin="20,0,0,0" VerticalAlignment="Center" Click="Skip_Click"
@@ -229,7 +251,7 @@
                         BorderThickness="1" CornerRadius="8" Padding="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,2,6,8">
-                            <TextBlock Text="✓ Keep" Foreground="#34C759" FontWeight="SemiBold" />
+                            <TextBlock Text="✓ Keep" Foreground="{StaticResource KeepBrush}" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding KeepPileSummary}" Margin="8,0,0,0"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
@@ -252,7 +274,7 @@
                         BorderThickness="1" CornerRadius="8" Padding="8">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,2,6,8">
-                            <TextBlock Text="✗ Reject" Foreground="#FF3B30" FontWeight="SemiBold" />
+                            <TextBlock Text="✗ Reject" Foreground="{StaticResource RejectBrush}" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding RejectPileSummary}" Margin="8,0,0,0"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
