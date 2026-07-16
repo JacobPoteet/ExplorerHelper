@@ -9,12 +9,19 @@
     <AssemblyTitle>Explorer Helper</AssemblyTitle>
     <Product>Explorer Helper</Product>
     <Description>Clean and organize folders straight from the Explorer context menu.</Description>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Embeds the icon in the exe's Win32 resource: the Explorer context-menu entry
          (Icon = the exe path) and the taskbar/alt-tab window icon both resolve to it. -->
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Compress the assemblies embedded in the single-file exe: ~162 MB -> ~71 MB for
+         roughly +0.3 s startup (decompressed in memory on launch). -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- Keep NuGet XML doc files (WebView2 ships several) out of the publish/zip output. -->
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
+    <!-- No PDB in shipped builds; the app surfaces exception messages, not stack traces. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
