@@ -28,6 +28,10 @@ public sealed class AppSettings
     /// </summary>
     public List<string>? EnabledPreviewDetails { get; set; }
 
+    /// <summary>Check GitHub for a newer release on startup and offer a one-click update.
+    /// Defaults to true (the initializer also covers settings files from older versions).</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
     private static string SettingsPath
     {
         get
