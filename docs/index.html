@@ -18,9 +18,12 @@
       --border: #4a4c58;
       --text: #e8e8ec;
       --muted: #9da0ac;
-      --accent: #8ab4f8;
-      --accent-2: #b39ddb;
-      --ok: #7ee2a8;
+      /* Matches the app: violet accent, mint keep, coral reject */
+      --accent: #a18bff;
+      --accent-2: #e879b9;
+      --accent-solid: #7c5cfc;
+      --ok: #3dd68c;
+      --bad: #ff5c7c;
       --radius: 12px;
       --maxw: 1080px;
     }
@@ -31,8 +34,8 @@
       font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
       color: var(--text);
       background:
-        radial-gradient(1200px 600px at 80% -10%, rgba(138,180,248,.14), transparent 60%),
-        radial-gradient(900px 500px at 0% 10%, rgba(179,157,219,.10), transparent 55%),
+        radial-gradient(1200px 600px at 80% -10%, rgba(124,92,252,.16), transparent 60%),
+        radial-gradient(900px 500px at 0% 10%, rgba(232,121,185,.09), transparent 55%),
         var(--bg);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
@@ -60,8 +63,8 @@
       transition: transform .06s ease, background .15s ease, border-color .15s ease;
     }
     .btn:hover { text-decoration: none; transform: translateY(-1px); }
-    .btn-primary { background: linear-gradient(180deg, #9cc0fb, #6fa0f6); color: #10131a; border-color: transparent; }
-    .btn-primary:hover { background: linear-gradient(180deg, #aecbfc, #7eabf7); }
+    .btn-primary { background: linear-gradient(180deg, #8d6dff, #6b46f0); color: #fff; border-color: transparent; }
+    .btn-primary:hover { background: linear-gradient(180deg, #9d81ff, #7c5cfc); }
     .btn-ghost { background: var(--panel); color: var(--text); }
     .btn-ghost:hover { border-color: var(--accent); }
 
@@ -85,19 +88,25 @@
       margin: 40px auto 0; border: 1px solid var(--border); border-radius: var(--radius);
       background: var(--bg-2); overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.45);
     }
-    .mock-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--bg-3); border-bottom: 1px solid var(--border); }
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
-    .mock-bar .title { margin-left: 10px; color: var(--muted); font-size: .85rem; }
+    /* Windows-style title bar: icon + title on the left, caption buttons on the right */
+    .mock-bar { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; background: var(--bg-3); border-bottom: 1px solid var(--border); }
+    .mock-bar .app-ic { font-size: .95rem; }
+    .mock-bar .title { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .caps { margin-left: auto; display: flex; }
+    .cap { width: 38px; height: 26px; display: grid; place-items: center; color: var(--muted); font-size: .68rem; border-radius: 5px; }
+    .cap.close { color: var(--text); }
     .mock-toolbar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
     .pill { background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; font-size: .82rem; color: var(--text); }
-    .pill.grow { flex: 1; color: var(--muted); }
+    .pill.search { color: var(--muted); min-width: 190px; }
+    .pill.primary { background: linear-gradient(180deg, #8d6dff, #6b46f0); border-color: transparent; color: #fff; font-weight: 600; }
+    .pill.update { background: rgba(124,92,252,.20); border-color: rgba(124,92,252,.55); color: #d9ccff; border-radius: 999px; }
+    .toolbar-spacer { flex: 1; }
     .mock-body { display: grid; grid-template-columns: 1.6fr 1fr; min-height: 320px; }
     .filelist { border-right: 1px solid var(--border); }
     .fl-head, .fl-row { display: grid; grid-template-columns: 34px 1fr 92px 60px; gap: 8px; padding: 8px 14px; align-items: center; }
     .fl-head { background: var(--bg-3); color: var(--muted); font-size: .78rem; border-bottom: 1px solid var(--border); }
     .fl-row { border-bottom: 1px solid rgba(74,76,88,.35); font-size: .86rem; }
-    .fl-row.sel { background: rgba(138,180,248,.14); }
+    .fl-row.sel { background: rgba(124,92,252,.17); }
     .name-cell { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
     .name-cell > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .thumb { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-size: .95rem; }
@@ -121,12 +130,12 @@
     .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
     .chip { background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: .76rem; }
     /* Dynamic date buttons are styled apart from static presets. */
-    .chip-date { background: linear-gradient(180deg, rgba(138,180,248,.28), rgba(111,160,246,.18)); border-color: rgba(138,180,248,.55); color: #cfe0ff; }
+    .chip-date { background: linear-gradient(180deg, rgba(124,92,252,.30), rgba(107,70,240,.18)); border-color: rgba(124,92,252,.55); color: #d9ccff; }
     .chip-add { background: transparent; color: var(--muted); font-weight: 700; }
     /* Triage flags on the file list */
     .flag { font-weight: 700; font-size: .8rem; }
     .flag.keep { color: var(--ok); }
-    .flag.reject { color: #ff6b6b; }
+    .flag.reject { color: var(--bad); }
 
     /* Sections */
     section { padding: 62px 0; }
@@ -140,7 +149,7 @@
       border: 1px solid var(--border); border-radius: var(--radius); padding: 22px;
       transition: transform .1s ease, border-color .15s ease;
     }
-    .card:hover { transform: translateY(-3px); border-color: rgba(138,180,248,.55); }
+    .card:hover { transform: translateY(-3px); border-color: rgba(124,92,252,.55); }
     .card .ic { font-size: 1.6rem; }
     .card h3 { margin: 12px 0 6px; font-size: 1.12rem; }
     .card p { margin: 0; color: var(--muted); font-size: .95rem; }
@@ -151,7 +160,7 @@
     .step::before {
       counter-increment: step; content: counter(step);
       display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #10131a;
+      background: linear-gradient(135deg, var(--accent-solid), var(--accent-2)); color: #fff;
       font-weight: 700; margin-bottom: 12px;
     }
     .step h3 { margin: 0 0 6px; font-size: 1.05rem; }
@@ -162,7 +171,7 @@
     .install-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
     .install-card h3 { margin-top: 0; }
     pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-x: auto; font-family: "Cascadia Code", Consolas, monospace; font-size: .85rem; color: #d6d9e2; }
-    .callout { border-left: 3px solid var(--accent); background: rgba(138,180,248,.08); padding: 12px 16px; border-radius: 0 8px 8px 0; color: var(--muted); font-size: .92rem; margin-top: 20px; }
+    .callout { border-left: 3px solid var(--accent-solid); background: rgba(124,92,252,.08); padding: 12px 16px; border-radius: 0 8px 8px 0; color: var(--muted); font-size: .92rem; margin-top: 20px; }
 
     footer { border-top: 1px solid var(--border); padding: 34px 0; color: var(--muted); font-size: .9rem; }
     .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -206,22 +215,26 @@
         <a href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/JacobPoteet/ExplorerHelper?label=release&sort=semver" /></a>
         <a href="https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/JacobPoteet/ExplorerHelper/actions/workflows/ci.yml/badge.svg" /></a>
         <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" />
-        <img alt="Windows 10 / 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0a7bff" />
+        <img alt="Windows 10 / 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-7C5CFC" />
       </div>
       <p class="note">Per-user install — no admin prompt. <kbd>Del</kbd> sends to the Recycle Bin, never permanent deletion.</p>
 
       <!-- App mock -->
       <div class="mock" role="img" aria-label="Screenshot of the Explorer Helper window: a sortable file list on the left and a preview pane on the right.">
         <div class="mock-bar">
-          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="app-ic">🧹</span>
           <span class="title">Explorer Helper — C:\Users\you\Videos\Clips</span>
+          <span class="caps" aria-hidden="true"><span class="cap">─</span><span class="cap">□</span><span class="cap close">✕</span></span>
         </div>
         <div class="mock-toolbar">
-          <span class="pill grow">🔎 Filter files by name…</span>
+          <span class="pill search">🔎 Filter files by name…</span>
           <span class="pill">Types ▾</span>
-          <span class="pill">🃏 Triage</span>
-          <span class="pill">↩ Undo</span>
-          <span class="pill">⚙ Settings</span>
+          <span class="toolbar-spacer"></span>
+          <span class="pill update">⬇ v0.5.0 available</span>
+          <span class="pill primary">🃏 Triage</span>
+          <span class="pill">↻</span>
+          <span class="pill">↩</span>
+          <span class="pill">⚙</span>
         </div>
         <div class="mock-body">
           <div class="filelist">
@@ -284,6 +297,7 @@
           <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p>Renamed, deleted, or committed the wrong thing? <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back — files come straight out of the Recycle Bin.</p></div>
           <div class="card"><div class="ic">🔠</div><h3>Filter &amp; sort</h3><p>Filter by name and toggle file types on or off. Sort by name, size, date, or type — folders always first.</p></div>
           <div class="card"><div class="ic">🗑️</div><h3>Safe by default</h3><p>Deletes go to the Recycle Bin, never a permanent wipe. Multi-select to clear several at once.</p></div>
+          <div class="card"><div class="ic">🔄</div><h3>Always up to date</h3><p>When a new release ships, an update button appears in the toolbar — one click downloads it, installs silently, and restarts the app right where you were. Toggleable in Settings.</p></div>
         </div>
       </div>
     </section>
@@ -314,7 +328,7 @@
         <div class="install-grid">
           <div class="install-card">
             <h3>⬇ Installer (recommended)</h3>
-            <p class="muted">Download <code>ExplorerHelper-Setup-*.exe</code> from the latest release and run it. It installs per-user (no admin prompt) and registers the context-menu entries. Uninstalling removes them again.</p>
+            <p class="muted">Download <code>ExplorerHelper-Setup-*.exe</code> from the latest release and run it. It installs per-user (no admin prompt) and registers the context-menu entries. Uninstalling removes them again — and from here the app keeps itself up to date with one-click updates.</p>
             <p><a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Download latest release</a></p>
             <p class="muted" style="font-size:.85rem">A portable zip is published with every release too — use the <strong>Add context menu</strong> button inside the app.</p>
           </div>
@@ -325,7 +339,7 @@
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip
-./build.ps1 -Version 0.3.0</code></pre>
+./build.ps1 -Version 0.4.0</code></pre>
           </div>
         </div>
         <div class="callout">
