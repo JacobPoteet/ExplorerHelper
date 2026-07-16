@@ -140,6 +140,16 @@
             </ToggleButton>
 
             <StackPanel Grid.Column="3" Orientation="Horizontal">
+                <!-- Self-update pill: appears when a newer GitHub release exists; shows
+                     download progress after click, then the app restarts updated. -->
+                <ui:Button Margin="0,0,12,0" CornerRadius="14"
+                           Background="{StaticResource AccentTintBrush}"
+                           BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                           Content="{Binding UpdateBadgeText}"
+                           Icon="{ui:SymbolIcon ArrowDownload24}"
+                           Command="{Binding ApplyUpdateCommand}"
+                           Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibility}}"
+                           ToolTip="A new version is ready — click to update; the app restarts on this folder" />
                 <ui:Button Appearance="Primary"
                            Content="Triage" Icon="{ui:SymbolIcon Stack24}"
                            Click="Triage_Click"
@@ -177,6 +187,17 @@
                         <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                    Text="Registers the &quot;Clean this folder&quot; right-click entry for folders. Per-user, no admin required; Remove deletes it again." />
+
+                        <Separator Margin="0,12" />
+
+                        <TextBlock Text="Updates" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,0,0,8" />
+                        <CheckBox Content="Check for updates on startup"
+                                  IsChecked="{Binding CheckForUpdates}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Looks at the latest GitHub release. When one is newer, an update button appears in the toolbar — one click installs it and restarts the app." />
 
                         <Separator Margin="0,12" />
 

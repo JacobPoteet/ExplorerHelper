@@ -57,6 +57,26 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Live sample of the created-date format (uses now as the sample date).</summary>
     public string CreatedFormatPreview => FormatDate(DateTime.Now, CreatedDateFormat);
 
+    // --- Self-update ------------------------------------------------------------------
+    // On startup (when enabled) the latest GitHub release is checked in the background; a
+    // newer version surfaces as a toolbar pill. Clicking it downloads the installer and
+    // hands off to a silent install that relaunches the app in the same folder.
+
+    /// <summary>Toolbar pill text: "v0.5.0 available", then download progress.</summary>
+    [ObservableProperty]
+    private string? _updateBadgeText;
+
+    /// <summary>True once a newer release is known; shows the update pill.</summary>
+    [ObservableProperty]
+    private bool _isUpdateAvailable;
+
+    /// <summary>Whether to check GitHub for a newer release on startup (Settings toggle).</summary>
+    [ObservableProperty]
+    private bool _checkForUpdates = true;
+
+    private UpdateInfo? _availableUpdate;
+    private bool _updateInProgress;
+
     public MainViewModel()
     {
         _settings = AppSettings.Load();
@@ -64,6 +84,9 @@ public partial class MainViewModel : ObservableObject
             QuickNameButtons.Add(name);
         TodayDateFormat = _settings.TodayDateFormat;
         CreatedDateFormat = _settings.CreatedDateFormat;
+        CheckForUpdates = _settings.CheckForUpdates;
+        if (CheckForUpdates)
+            _ = CheckForUpdatesInBackgroundAsync();
 
         // Null (never configured) → defaults; an explicit empty list means the user hid them all.
         var enabledDetails = _settings.EnabledPreviewDetails is { } saved
@@ -74,6 +97,53 @@ public partial class MainViewModel : ObservableObject
             var toggle = new PreviewDetailToggle(key, label, enabledDetails.Contains(key));
             toggle.PropertyChanged += OnPreviewDetailToggleChanged;
             PreviewDetailToggles.Add(toggle);
+        }
+    }
+
+    partial void OnCheckForUpdatesChanged(bool value)
+    {
+        _settings.CheckForUpdates = value;
+        _settings.Save();
+    }
+
+    private async Task CheckForUpdatesInBackgroundAsync()
+    {
+        var info = await UpdateService.CheckForUpdateAsync();
+        if (info is null)
+            return;
+        _availableUpdate = info;
+        UpdateBadgeText = $"v{info.Version.ToString(3)} available";
+        IsUpdateAvailable = true;
+    }
+
+    [RelayCommand]
+    private async Task ApplyUpdateAsync()
+    {
+        if (_availableUpdate is null || _updateInProgress)
+            return;
+
+        // Portable copies can't be swapped out from under themselves safely — send those
+        // to the release page; installed copies get the seamless silent update.
+        if (!UpdateService.IsInstalledCopy())
+        {
+            Process.Start(new ProcessStartInfo(_availableUpdate.ReleasePageUrl) { UseShellExecute = true });
+            return;
+        }
+
+        _updateInProgress = true;
+        try
+        {
+            var progress = new Progress<double>(p => UpdateBadgeText = $"Downloading… {p:P0}");
+            var installer = await UpdateService.DownloadInstallerAsync(_availableUpdate, progress);
+            UpdateBadgeText = "Restarting…";
+            UpdateService.ApplyUpdate(installer, Directory.Exists(FolderPath) ? FolderPath : null);
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            UpdateBadgeText = $"v{_availableUpdate.Version.ToString(3)} available";
+            StatusText = $"Update failed — {ex.Message}";
+            _updateInProgress = false;
         }
     }
 
