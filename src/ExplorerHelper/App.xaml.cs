@@ -1,6 +1,8 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Win32;
+using Wpf.Ui.Appearance;
 
 namespace ExplorerHelper;
 
@@ -9,6 +11,11 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Brand accent (violet) instead of the system/Windows default blue. Regenerates the
+        // Primary/Secondary/Tertiary accent shades every themed control derives from.
+        ApplicationAccentColorManager.Apply(
+            Color.FromRgb(0x7C, 0x5C, 0xFC), ApplicationTheme.Dark);
 
         DispatcherUnhandledException += (_, args) =>
         {

@@ -9,7 +9,7 @@ namespace ExplorerHelper;
 /// "move kept files to…" destination (e.g. pull the good shots off an SD card in the
 /// same step). The last destination is remembered for the session.
 /// </summary>
-public partial class CommitDialog : Window
+public partial class CommitDialog : Wpf.Ui.Controls.FluentWindow
 {
     /// <summary>Remembered across commits within this app run.</summary>
     private static string? _lastDestination;

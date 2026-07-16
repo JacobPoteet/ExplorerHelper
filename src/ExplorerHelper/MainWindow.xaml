@@ -70,7 +70,7 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Bd" Property="Background"
-                                        Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                        Value="{StaticResource AccentTintBrush}" />
                                 <Setter TargetName="Bd" Property="BorderBrush"
                                         Value="{DynamicResource AccentFillColorDefaultBrush}" />
                             </Trigger>
@@ -78,6 +78,27 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Keyboard-key chips for the status bar shortcut hints -->
+        <Style x:Key="KbdChip" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="KbdText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="KbdLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="5,0,12,0" />
         </Style>
     </ui:FluentWindow.Resources>
 
@@ -96,12 +117,46 @@
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
-        <!-- Toolbar -->
-        <DockPanel Grid.Row="1" Margin="12,4,12,10" LastChildFill="True">
-            <ToggleButton x:Name="SettingsButton" DockPanel.Dock="Right" Margin="6,0,0,0"
-                          ToolTip="Settings">
-                <ui:SymbolIcon Symbol="Settings24" />
+        <!-- Toolbar: find/filter on the left, actions on the right (Triage is the hero CTA,
+             the utility buttons are icon-only to keep it quiet) -->
+        <Grid Grid.Row="1" Margin="12,4,12,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <ui:TextBox x:Name="FilterBox" Grid.Column="0" Width="260"
+                        Icon="{ui:SymbolIcon Search24}"
+                        PlaceholderText="Filter files by name"
+                        Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" />
+            <ToggleButton x:Name="TypesButton" Grid.Column="1" Margin="8,0,0,0"
+                          ToolTip="Show or hide files by type">
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Symbol="Filter24" />
+                    <TextBlock Text="Types" Margin="8,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
             </ToggleButton>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                <ui:Button Appearance="Primary"
+                           Content="Triage" Icon="{ui:SymbolIcon Stack24}"
+                           Click="Triage_Click"
+                           ToolTip="Review files one by one — swipe right to keep, left to reject, then commit everything at once" />
+                <Border Width="1" Margin="12,4"
+                        Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+                <ui:Button Icon="{ui:SymbolIcon ArrowClockwise24}"
+                           Command="{Binding RefreshCommand}" ToolTip="Refresh" />
+                <ui:Button Margin="6,0,0,0" Icon="{ui:SymbolIcon ArrowUndo24}"
+                           Command="{Binding UndoCommand}"
+                           ToolTip="Undo the last rename or delete (Ctrl+Z)" />
+                <ui:Button Margin="6,0,0,0" Icon="{ui:SymbolIcon Open24}"
+                           Command="{Binding OpenInExplorerCommand}" ToolTip="Open in Explorer" />
+                <ToggleButton x:Name="SettingsButton" Margin="6,0,0,0" ToolTip="Settings">
+                    <ui:SymbolIcon Symbol="Settings24" />
+                </ToggleButton>
+            </StackPanel>
             <Popup PlacementTarget="{Binding ElementName=SettingsButton}" Placement="Bottom"
                    StaysOpen="False" AllowsTransparency="True"
                    IsOpen="{Binding IsChecked, ElementName=SettingsButton, Mode=TwoWay}">
@@ -202,22 +257,6 @@
                     </ScrollViewer>
                 </Border>
             </Popup>
-            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
-                       Content="Open in Explorer" Icon="{ui:SymbolIcon Open24}"
-                       Command="{Binding OpenInExplorerCommand}" />
-            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
-                       Content="Undo" Icon="{ui:SymbolIcon ArrowUndo24}"
-                       Command="{Binding UndoCommand}"
-                       ToolTip="Undo the last rename or delete (Ctrl+Z)" />
-            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0"
-                       Content="Refresh" Icon="{ui:SymbolIcon ArrowClockwise24}"
-                       Command="{Binding RefreshCommand}" />
-            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Appearance="Primary"
-                       Content="Triage" Icon="{ui:SymbolIcon Stack24}"
-                       Click="Triage_Click"
-                       ToolTip="Review files one by one — swipe right to keep, left to reject, then commit everything at once" />
-            <ToggleButton x:Name="TypesButton" DockPanel.Dock="Right" Margin="6,0,0,0"
-                          Content="Types" ToolTip="Show or hide files by type" />
             <Popup PlacementTarget="{Binding ElementName=TypesButton}" Placement="Bottom"
                    StaysOpen="False" AllowsTransparency="True"
                    IsOpen="{Binding IsChecked, ElementName=TypesButton, Mode=TwoWay}">
@@ -248,10 +287,7 @@
                     </StackPanel>
                 </Border>
             </Popup>
-            <ui:TextBox x:Name="FilterBox" Icon="{ui:SymbolIcon Search24}"
-                        PlaceholderText="Filter files by name"
-                        Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" />
-        </DockPanel>
+        </Grid>
 
         <!-- Main split: file list | preview -->
         <Grid Grid.Row="2" Margin="12,0,12,0">
@@ -301,11 +337,11 @@
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding Flag}" Value="Keep">
                                                             <Setter Property="Text" Value="✓" />
-                                                            <Setter Property="Foreground" Value="#34C759" />
+                                                            <Setter Property="Foreground" Value="{StaticResource KeepBrush}" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding Flag}" Value="Reject">
                                                             <Setter Property="Text" Value="✗" />
-                                                            <Setter Property="Foreground" Value="#FF3B30" />
+                                                            <Setter Property="Foreground" Value="{StaticResource RejectBrush}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -407,12 +443,18 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,18,2">
-                                    <TextBlock Text="{Binding Label}" FontSize="12"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                                    <TextBlock Text="{Binding Value}" FontSize="12" Margin="6,0,0,0"
-                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                </StackPanel>
+                                <!-- Pill chip per detail row -->
+                                <Border Margin="0,3,8,3" Padding="10,3" CornerRadius="10"
+                                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Label}" FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                        <TextBlock Text="{Binding Value}" FontSize="12" Margin="6,0,0,0"
+                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    </StackPanel>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -425,8 +467,13 @@
                         BorderThickness="1" CornerRadius="8"
                         IsEnabled="False">
                     <StackPanel>
-                        <TextBlock Text="QUICK RENAME" FontSize="11" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <ui:SymbolIcon Symbol="Rename24" FontSize="14" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="QUICK RENAME" FontSize="11" FontWeight="SemiBold"
+                                       Margin="6,0,0,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                         <DockPanel LastChildFill="True">
                             <TextBlock x:Name="RenameExtLabel" DockPanel.Dock="Right" VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -513,11 +560,30 @@
             </Grid>
         </Grid>
 
-        <!-- Status bar -->
+        <!-- Status bar: status on the left, shortcut hints as keyboard-key chips on the right -->
         <DockPanel Grid.Row="3" Margin="14,8,14,10">
-            <TextBlock DockPanel.Dock="Right"
-                       Text="Del = Recycle Bin · F2 = Rename · Enter = Open · K/X = Keep/Reject · U = Unmark"
-                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="11" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Border Style="{StaticResource KbdChip}">
+                    <TextBlock Style="{StaticResource KbdText}" Text="Del" />
+                </Border>
+                <TextBlock Style="{StaticResource KbdLabel}" Text="recycle" />
+                <Border Style="{StaticResource KbdChip}">
+                    <TextBlock Style="{StaticResource KbdText}" Text="F2" />
+                </Border>
+                <TextBlock Style="{StaticResource KbdLabel}" Text="rename" />
+                <Border Style="{StaticResource KbdChip}">
+                    <TextBlock Style="{StaticResource KbdText}" Text="Enter" />
+                </Border>
+                <TextBlock Style="{StaticResource KbdLabel}" Text="open" />
+                <Border Style="{StaticResource KbdChip}">
+                    <TextBlock Style="{StaticResource KbdText}" Text="K / X" />
+                </Border>
+                <TextBlock Style="{StaticResource KbdLabel}" Text="keep / reject" />
+                <Border Style="{StaticResource KbdChip}">
+                    <TextBlock Style="{StaticResource KbdText}" Text="U" />
+                </Border>
+                <TextBlock Style="{StaticResource KbdLabel}" Text="unmark" Margin="5,0,0,0" />
+            </StackPanel>
             <TextBlock Text="{Binding StatusText}" FontSize="12"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         </DockPanel>
