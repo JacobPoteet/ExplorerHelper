@@ -137,6 +137,123 @@
     .flag.keep { color: var(--ok); }
     .flag.reject { color: var(--bad); }
 
+    /* ---- Triage demo animation --------------------------------------------------
+       A 12s pure-CSS loop: three cards swipe (right = keep, left = reject) with
+       stamps and live counters, then a review panel commits — the reject flies
+       into the Recycle Bin. Every element's resting style matches its 0% frame,
+       so prefers-reduced-motion simply shows the idle deck. */
+    .tr-mock { max-width: 660px; margin: 0 auto; }
+    .tr-stage { position: relative; height: 360px; background: var(--bg-2); overflow: hidden; }
+    .tr-top { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px; }
+    .tr-pill { border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px; font-size: .82rem; font-weight: 600; }
+    .tr-pill.rej { background: rgba(255,92,124,.14); border-color: rgba(255,92,124,.4); color: var(--bad); }
+    .tr-pill.kep { background: rgba(61,214,140,.14); border-color: rgba(61,214,140,.4); color: var(--ok); }
+    .tr-remaining { color: var(--muted); font-size: .8rem; }
+    /* Digits stack in the same grid cell so they overlay each other while
+       staying in normal flow — keeps them on the text baseline next to the icons. */
+    .tr-count { display: inline-grid; min-width: .72em; text-align: center; }
+    .tr-count span { grid-area: 1 / 1; opacity: 0; animation: 12s ease-in-out infinite; }
+    .tr-count .v0 { opacity: 1; }
+
+    .tr-deck { position: absolute; inset: 46px 0 0 0; }
+    .tr-card {
+      position: absolute; left: 50%; top: 26px; width: 250px; height: 236px; margin-left: -125px;
+      background: var(--bg-3); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 14px 40px rgba(0,0,0,.35);
+      animation: 12s ease-in-out infinite;
+    }
+    .tr-face { flex: 1; display: grid; place-items: center; font-size: 3rem; }
+    .tr-face.sunset { background: linear-gradient(160deg,#7c5cfc33,#e879b933), linear-gradient(180deg,#2b2440,#3a2333); }
+    .tr-face.blurry { background: linear-gradient(160deg,#48556333,#29323c66), var(--bg); filter: none; }
+    .tr-face.blurry span { filter: blur(3px) saturate(.7); }
+    .tr-face.shot { background: linear-gradient(160deg,#6f86d633,#48c6ef33), var(--bg); }
+    .tr-name { padding: 9px 12px; font-size: .8rem; color: var(--muted); border-top: 1px solid var(--border); background: var(--bg-2); }
+    .tr-stamp {
+      position: absolute; top: 20px; font-weight: 800; font-size: 1.35rem; letter-spacing: .06em;
+      border: 4px solid; border-radius: 9px; padding: 3px 12px; opacity: 0;
+      animation: 12s ease-in-out infinite;
+    }
+    .tr-stamp.keep { left: 16px; color: var(--ok); border-color: var(--ok); background: rgba(61,214,140,.14); transform: rotate(-14deg); }
+    .tr-stamp.rej { right: 16px; color: var(--bad); border-color: var(--bad); background: rgba(255,92,124,.14); transform: rotate(14deg); }
+
+    /* Card A: keep. B: reject. C: keep. */
+    .tr-a { animation-name: trCardA; z-index: 3; }
+    .tr-b { animation-name: trCardB; z-index: 2; transform: scale(.94) translateY(-14px); opacity: .55; }
+    .tr-c { animation-name: trCardC; z-index: 1; transform: scale(.88) translateY(-28px); opacity: .3; }
+    .tr-a .keep { animation-name: trStampA; }
+    .tr-b .rej { animation-name: trStampB; }
+    .tr-c .keep { animation-name: trStampC; }
+    @keyframes trCardA {
+      0%, 6%   { transform: none; opacity: 1; }
+      13%, 92% { transform: translateX(170%) rotate(18deg); opacity: 0; }
+      93%      { transform: none; opacity: 0; }
+      97%,100% { transform: none; opacity: 1; }
+    }
+    @keyframes trCardB {
+      0%, 13%  { transform: scale(.94) translateY(-14px); opacity: .55; }
+      16%, 22% { transform: none; opacity: 1; }
+      29%, 92% { transform: translateX(-170%) rotate(-18deg); opacity: 0; }
+      93%      { transform: scale(.94) translateY(-14px); opacity: 0; }
+      97%,100% { transform: scale(.94) translateY(-14px); opacity: .55; }
+    }
+    @keyframes trCardC {
+      0%, 16%  { transform: scale(.88) translateY(-28px); opacity: .3; }
+      19%, 29% { transform: scale(.94) translateY(-14px); opacity: .55; }
+      32%, 38% { transform: none; opacity: 1; }
+      45%, 92% { transform: translateX(170%) rotate(18deg); opacity: 0; }
+      93%      { transform: scale(.88) translateY(-28px); opacity: 0; }
+      97%,100% { transform: scale(.88) translateY(-28px); opacity: .3; }
+    }
+    @keyframes trStampA { 0%,5% { opacity: 0; } 8%,13% { opacity: 1; } 14%,100% { opacity: 0; } }
+    @keyframes trStampB { 0%,20% { opacity: 0; } 23%,29% { opacity: 1; } 30%,100% { opacity: 0; } }
+    @keyframes trStampC { 0%,36% { opacity: 0; } 39%,45% { opacity: 1; } 46%,100% { opacity: 0; } }
+
+    /* Counters: keep 0→1→2, reject 0→1, remaining 3→2→1→0 */
+    .tr-count .v1, .tr-count .v2, .tr-count .v3 { opacity: 0; }
+    .kc .v0 { animation-name: trK0; } .kc .v1 { animation-name: trK1; } .kc .v2 { animation-name: trK2; }
+    .rc .v0 { animation-name: trR0; } .rc .v1 { animation-name: trR1; }
+    .lc .v3 { animation-name: trL3; } .lc .v2 { animation-name: trL2; } .lc .v1 { animation-name: trL1; } .lc .v0 { animation-name: trL0; }
+    @keyframes trK0 { 0%,12% { opacity: 1; } 13%,95% { opacity: 0; } 96%,100% { opacity: 1; } }
+    @keyframes trK1 { 0%,12% { opacity: 0; } 13%,44% { opacity: 1; } 45%,100% { opacity: 0; } }
+    @keyframes trK2 { 0%,44% { opacity: 0; } 45%,95% { opacity: 1; } 96%,100% { opacity: 0; } }
+    @keyframes trR0 { 0%,28% { opacity: 1; } 29%,95% { opacity: 0; } 96%,100% { opacity: 1; } }
+    @keyframes trR1 { 0%,28% { opacity: 0; } 29%,95% { opacity: 1; } 96%,100% { opacity: 0; } }
+    @keyframes trL3 { 0%,12% { opacity: 1; } 13%,95% { opacity: 0; } 96%,100% { opacity: 1; } }
+    @keyframes trL2 { 0%,12% { opacity: 0; } 13%,28% { opacity: 1; } 29%,100% { opacity: 0; } }
+    @keyframes trL1 { 0%,28% { opacity: 0; } 29%,44% { opacity: 1; } 45%,100% { opacity: 0; } }
+    @keyframes trL0 { 0%,44% { opacity: 0; } 45%,95% { opacity: 1; } 96%,100% { opacity: 0; } }
+
+    /* "All caught up" beat between the last swipe and the review panel */
+    .tr-done { position: absolute; inset: 46px 0 0 0; display: grid; place-items: center; opacity: 0; animation: trDone 12s ease-in-out infinite; }
+    .tr-done .big { font-size: 1.25rem; font-weight: 700; }
+    .tr-done .sub2 { color: var(--muted); font-size: .85rem; text-align: center; }
+    @keyframes trDone { 0%,47% { opacity: 0; } 50%,55% { opacity: 1; } 58%,100% { opacity: 0; } }
+
+    /* Review + commit */
+    .tr-review { position: absolute; inset: 0; z-index: 5; padding: 16px 18px; background: var(--bg-2); opacity: 0; transform: translateY(18px); animation: trReview 12s ease-in-out infinite; }
+    @keyframes trReview { 0%,58% { opacity: 0; transform: translateY(18px); } 62%,88% { opacity: 1; transform: none; } 92%,100% { opacity: 0; transform: translateY(18px); } }
+    .tr-review h4 { margin: 0 0 12px; font-size: .95rem; }
+    .tr-piles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .tr-pile { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg-3); min-height: 118px; }
+    .tr-pile h5 { margin: 0 0 8px; font-size: .8rem; }
+    .tr-pile h5.k { color: var(--ok); } .tr-pile h5.r { color: var(--bad); }
+    .tr-mini { display: inline-grid; place-items: center; width: 52px; height: 44px; border-radius: 8px; margin-right: 8px; font-size: 1.2rem; }
+    .tr-fly { animation: trFly 12s ease-in-out infinite; }
+    @keyframes trFly { 0%,70% { transform: none; opacity: 1; } 76%,100% { transform: translate(30px,64px) scale(.1); opacity: 0; } }
+    .tr-commitrow { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .tr-bin { font-size: 1.3rem; animation: trBin 12s ease-in-out infinite; }
+    @keyframes trBin { 0%,73% { transform: none; } 75% { transform: scale(1.3); } 78%,100% { transform: none; } }
+    .tr-commit { margin-left: auto; background: linear-gradient(180deg, #8d6dff, #6b46f0); color: #fff; font-weight: 600; font-size: .85rem; border-radius: 8px; padding: 7px 16px; animation: trCommit 12s ease-in-out infinite; }
+    @keyframes trCommit { 0%,65% { transform: none; } 67% { transform: scale(.92); } 69%,100% { transform: none; } }
+    .tr-status { color: var(--muted); font-size: .8rem; opacity: 0; animation: trStatus 12s ease-in-out infinite; }
+    @keyframes trStatus { 0%,77% { opacity: 0; } 81%,88% { opacity: 1; } 92%,100% { opacity: 0; } }
+
+    .tr-hints { text-align: center; color: var(--muted); font-size: .88rem; margin-top: 18px; }
+    @media (prefers-reduced-motion: reduce) {
+      #triage .tr-anim, #triage .tr-anim * { animation: none !important; }
+    }
+
     /* Sections */
     section { padding: 62px 0; }
     section h2 { font-size: clamp(1.6rem, 3.5vw, 2.2rem); margin: 0 0 8px; letter-spacing: -.3px; }
@@ -189,6 +306,7 @@
     <div class="wrap nav-inner">
       <div class="brand"><span class="logo">🧹</span> Explorer Helper</div>
       <nav class="nav-links">
+        <a href="#triage">Triage</a>
         <a href="#features">Features</a>
         <a href="#how">How it works</a>
         <a href="#install">Install</a>
@@ -277,6 +395,75 @@
         </div>
       </div>
     </div>
+
+    <div class="wrap"><div class="divider"></div></div>
+
+    <!-- Triage demo -->
+    <section id="triage">
+      <div class="wrap">
+        <h2>Swipe. Swipe. Done.</h2>
+        <p class="sub">Sort a folder like a dating app — keep the good, reject the junk. Nothing happens to your files until you've reviewed every decision and applied them all with one click.</p>
+        <div class="mock tr-mock tr-anim" role="img" aria-label="Animation of triage mode: file cards swipe right to keep and left to reject with stamps, counters tick up, then a review screen applies the changes — the reject flies into the Recycle Bin, and Ctrl+Z can undo everything.">
+          <div class="mock-bar">
+            <span class="app-ic">🧹</span>
+            <span class="title">Explorer Helper — Triage</span>
+            <span class="caps" aria-hidden="true"><span class="cap">─</span><span class="cap">□</span><span class="cap close">✕</span></span>
+          </div>
+          <div class="tr-stage">
+            <div class="tr-top">
+              <span class="tr-pill rej">✗ <span class="tr-count rc"><span class="v0">0</span><span class="v1">1</span></span></span>
+              <span class="tr-remaining"><span class="tr-count lc"><span class="v3">3</span><span class="v2">2</span><span class="v1">1</span><span class="v0">0</span></span> left</span>
+              <span class="tr-pill kep">✓ <span class="tr-count kc"><span class="v0">0</span><span class="v1">1</span><span class="v2">2</span></span></span>
+            </div>
+
+            <div class="tr-deck">
+              <div class="tr-card tr-c">
+                <div class="tr-face shot"><span>🖼</span></div>
+                <div class="tr-name">screenshot 2026-07-04.png</div>
+                <div class="tr-stamp keep">KEEP</div>
+              </div>
+              <div class="tr-card tr-b">
+                <div class="tr-face blurry"><span>🖼</span></div>
+                <div class="tr-name">IMG_0421 (blurry).jpg</div>
+                <div class="tr-stamp rej">REJECT</div>
+              </div>
+              <div class="tr-card tr-a">
+                <div class="tr-face sunset"><span>🎬</span></div>
+                <div class="tr-name">sunset_drone_4k.mp4</div>
+                <div class="tr-stamp keep">KEEP</div>
+              </div>
+              <div class="tr-done">
+                <div>
+                  <div class="big">All caught up ✓</div>
+                  <div class="sub2">2 keep · 1 reject — take one last look</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tr-review">
+              <h4>One last look before anything happens</h4>
+              <div class="tr-piles">
+                <div class="tr-pile">
+                  <h5 class="k">✓ Keep (2)</h5>
+                  <span class="tr-mini tr-face sunset">🎬</span>
+                  <span class="tr-mini tr-face shot">🖼</span>
+                </div>
+                <div class="tr-pile">
+                  <h5 class="r">✗ Reject (1)</h5>
+                  <span class="tr-mini tr-face blurry tr-fly"><span>🖼</span></span>
+                </div>
+              </div>
+              <div class="tr-commitrow">
+                <span class="tr-bin">🗑️</span>
+                <span class="tr-status">Done — 1 recycled · 2 kept · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it all</span>
+                <span class="tr-commit">Commit…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="tr-hints">Drag with the mouse or fly with the keyboard — <kbd>←</kbd> reject · <kbd>→</kbd> keep · <kbd>↓</kbd> skip · <kbd>Backspace</kbd> rewind.</p>
+      </div>
+    </section>
 
     <div class="wrap"><div class="divider"></div></div>
 
