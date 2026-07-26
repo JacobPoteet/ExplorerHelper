@@ -26,8 +26,9 @@ dotnet run --project src/ExplorerHelper -- "C:\some\folder"
 src/ExplorerHelper/bin/Debug/net8.0-windows/ExplorerHelper.exe "C:\some\folder"
 
 # Publish self-contained exe + portable zip into artifacts/ (also the CI smoke test)
-./build.ps1 -Version 0.1.0
-./build.ps1 -Version 0.1.0 -Installer   # also builds Inno Setup installer
+# (build.ps1 defaults -Version to the current release, 0.4.0)
+./build.ps1 -Version 0.4.0
+./build.ps1 -Version 0.4.0 -Installer   # also builds Inno Setup installer
 ```
 
 There is **no test project**. Verify changes by driving the running app (see below).
@@ -51,7 +52,7 @@ There is **no test project**. Verify changes by driving the running app (see bel
   Hosts its own `PreviewPane` (`CardPreview`).
 - `Services/` — `AppSettings` (JSON persistence), `ContextMenuRegistrar` (registry entries),
   `RecycleBinService`, `ShellThumbnailService` (shell thumbnails), `ShellPropertyService`
-  (media metadata via the shell property store).
+  (media metadata via the shell property store), `UpdateService` (self-update from GitHub releases).
 - `Models/` — `FileEntry` (the list item), `TriageFlag`, `TypeFilter`, `PreviewDetail`.
 
 ## Conventions that aren't obvious
@@ -74,6 +75,13 @@ There is **no test project**. Verify changes by driving the running app (see bel
 - **Background work** (thumbnails, media metadata) runs on `Task.Run` with a `CancellationTokenSource`
   that's cancelled when the selection changes; results are marshalled back via
   `Application.Current.Dispatcher` and dropped if the selection has moved on.
+- **Self-update** (`UpdateService`): a background check hits the GitHub releases API and, if a newer
+  tag exists, shows an update pill (wired through `MainViewModel`, gated by the `CheckForUpdates`
+  setting). `CheckForUpdateAsync` never throws — offline/rate-limited/malformed all read as "no
+  update". Only *installed* copies (detected via the Inno Setup per-user uninstall key,
+  `IsInstalledCopy()`) get the seamless silent-install-and-relaunch path; portable copies are sent
+  to the release page. Release tags and the `ExplorerHelper-Setup-*.exe` asset name are the contract
+  the check relies on — keep them stable.
 
 ## Verifying UI changes (drive the real app)
 
