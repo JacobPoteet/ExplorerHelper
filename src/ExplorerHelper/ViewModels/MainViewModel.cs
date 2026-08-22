@@ -358,6 +358,7 @@ public partial class MainViewModel : ObservableObject
 
     private List<FileEntry> _allEntries = [];
     private CancellationTokenSource? _thumbnailCts;
+    private CancellationTokenSource? _childCountCts;
 
     partial void OnFilterTextChanged(string value) => ApplyView();
 
@@ -404,12 +405,15 @@ public partial class MainViewModel : ObservableObject
         BuildTypeFilters();
         RecomputeTriage();
         ApplyView();
+        LoadFolderChildCountsInBackground();
         LoadThumbnailsInBackground();
     }
 
     [RelayCommand]
     private void Refresh()
     {
+        // Refresh means "re-read the disk", so cached subtree totals go too (issue #40).
+        FolderScanService.ClearCache();
         if (!string.IsNullOrEmpty(FolderPath))
             LoadFolder(FolderPath);
     }
@@ -461,6 +465,7 @@ public partial class MainViewModel : ObservableObject
             // shell doesn't always report it; without one the file is simply not undoable (issue #32).
             if (result.RecycledPath is { } recycled)
                 restorable.Add((entry.FullPath, recycled));
+            FolderScanService.Invalidate(entry.FullPath);
             Files.Remove(entry);
             _allEntries.Remove(entry);
         }
@@ -620,6 +625,11 @@ public partial class MainViewModel : ObservableObject
             PushUndo(label, () => ReverseCommit(moved, recycled, copied));
         }
 
+        // Recycling and moving both change what the source and destination trees add up to.
+        FolderScanService.Invalidate(FolderPath);
+        if (!string.IsNullOrWhiteSpace(keepDestination))
+            FolderScanService.Invalidate(keepDestination);
+
         // The session is done — clear every flag before the reload so none carry over.
         foreach (var entry in _allEntries)
             entry.Flag = TriageFlag.None;
@@ -683,6 +693,7 @@ public partial class MainViewModel : ObservableObject
         CanUndo = _undoStack.Count > 0;
 
         var error = op.Reverse();
+        FolderScanService.ClearCache(); // an undo can move or restore anything, anywhere
 
         if (!string.IsNullOrEmpty(FolderPath))
             LoadFolder(FolderPath); // rebuilds the list; UpdateStatus runs inside
@@ -960,6 +971,33 @@ public partial class MainViewModel : ObservableObject
             ? $" · triage: ✓ {KeepCount} keep, ✗ {RejectCount} reject"
             : string.Empty;
         StatusText = $"{files} files, {folders} folders — {FileEntry.FormatSize(totalSize)}{triage}";
+    }
+
+    /// <summary>
+    /// Fills in each folder's direct-child count so the Size column reads "14 items" instead of a
+    /// blank (issue #40). One shallow enumeration per folder costs well under a millisecond, so
+    /// this finishes long before the thumbnails do; the recursive size is a per-selection job.
+    /// </summary>
+    private void LoadFolderChildCountsInBackground()
+    {
+        _childCountCts?.Cancel();
+        _childCountCts = new CancellationTokenSource();
+        var token = _childCountCts.Token;
+        var folders = _allEntries.Where(e => e.IsDirectory).ToList();
+        if (folders.Count == 0)
+            return;
+
+        Task.Run(() =>
+        {
+            foreach (var entry in folders)
+            {
+                if (token.IsCancellationRequested)
+                    return;
+                // Same cross-thread property set the thumbnail pass uses — WPF marshals the
+                // change notification to the UI thread for a plain (non-collection) property.
+                entry.ChildCount = FolderScanService.CountChildren(entry.FullPath);
+            }
+        }, token);
     }
 
     private void LoadThumbnailsInBackground()

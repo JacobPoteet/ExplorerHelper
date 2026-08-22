@@ -21,6 +21,15 @@ public partial class FileEntry : ObservableObject
     [ObservableProperty]
     private BitmapSource? _thumbnail;
 
+    /// <summary>
+    /// Direct children of a folder, filled in by a background pass after the list loads (issue #40).
+    /// Null until counted, and for files. Windows keeps no folder size, so the Size column shows
+    /// this cheap count instead; the recursive total is a per-selection job, not a per-row one.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SizeDisplay))]
+    private int? _childCount;
+
     /// <summary>Triage decision (keep/reject) — session-only; applied to disk on commit.</summary>
     [ObservableProperty]
     private TriageFlag _flag;
@@ -47,7 +56,16 @@ public partial class FileEntry : ObservableObject
         Name = Path.GetFileName(newFullPath);
     }
 
-    public string SizeDisplay => IsDirectory ? string.Empty : FormatSize(SizeBytes);
+    public string SizeDisplay => IsDirectory ? FormatChildCount(ChildCount) : FormatSize(SizeBytes);
+
+    /// <summary>Renders a folder's direct-child count, or blank while the count is still pending.</summary>
+    private static string FormatChildCount(int? count) => count switch
+    {
+        null => string.Empty,
+        0 => "empty",
+        1 => "1 item",
+        _ => $"{count} items",
+    };
 
     public string ModifiedDisplay => Modified.ToString("yyyy-MM-dd HH:mm");
 

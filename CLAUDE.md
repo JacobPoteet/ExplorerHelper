@@ -63,7 +63,8 @@ Inside `src/ExplorerHelper`:
   Hosts its own `PreviewPane` (`CardPreview`).
 - `Services/` — `AppSettings` (JSON persistence), `ContextMenuRegistrar` (registry entries),
   `RecycleBinService`, `ShellThumbnailService` (shell thumbnails), `ShellPropertyService`
-  (media metadata via the shell property store), `UpdateService` (self-update from GitHub releases).
+  (media metadata via the shell property store), `UpdateService` (self-update from GitHub releases),
+  `FolderScanService` (folder item counts and subtree sizes).
 - `Models/` — `FileEntry` (the list item), `TriageFlag`, `TypeFilter`, and `PreviewDetail.cs`,
   which holds three types: `PreviewDetailRow`, `PreviewDetailToggle`, and the `PreviewDetailKinds`
   catalogue (the key list plus `DefaultEnabled`, which turns on 6 of the 8 details).
@@ -92,9 +93,17 @@ Inside `src/ExplorerHelper`:
 - **PROPVARIANT interop** (`ShellPropertyService`): the struct uses two `IntPtr` union slots so it's
   the right size on x86 and x64; values are coerced with the `propsys.dll` `PropVariantToXxx` helpers
   rather than parsing the union by hand. Always `PropVariantClear` after reading.
-- **Background work** (thumbnails, media metadata) runs on `Task.Run` with a `CancellationTokenSource`
-  that's cancelled when the selection changes; results are marshalled back via
+- **Background work** (thumbnails, media metadata, folder child counts) runs on `Task.Run` with a
+  `CancellationTokenSource` that's cancelled when the selection changes; results are marshalled back via
   `Application.Current.Dispatcher` and dropped if the selection has moved on.
+- **Folder stats are two-tier** (`FolderScanService`, issue #40). Windows caches no folder size —
+  the shell property store returns nothing for `System.Size` on a directory — so every number costs
+  an enumeration. `CountChildren` (direct children, sub-millisecond) runs for every folder row on
+  load; `Scan` (whole subtree, seconds on a large tree) runs only for the selected folder, with
+  cancellation, progress callbacks, and a session cache. Both use `FileSystemEnumerable<long>`
+  reading sizes off `WIN32_FIND_DATA`; a `FileInfo` per entry is 3-5x slower. `AttributesToSkip`
+  filters entries found *during* enumeration, not the root you hand the enumerator, so any fan-out
+  over a directory list must drop reparse points itself or it double-counts junctions.
 - **Self-update** (`UpdateService`): a background check hits the GitHub releases API and, if a newer
   tag exists, shows an update pill (wired through `MainViewModel`, gated by the `CheckForUpdates`
   setting). `CheckForUpdateAsync` never throws — offline/rate-limited/malformed all read as "no
