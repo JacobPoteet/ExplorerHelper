@@ -19,10 +19,11 @@ tour of the app — or jump straight to the
 - **Triage mode** — the fastest way to clear out a folder: review files one at a time like a
   dating app, swipe (or `←`/`→`) to reject or keep, `↓` skips, `Backspace` rewinds. Nothing
   touches the disk while you swipe — a review screen shows both piles (swap or unmark any file),
-  then one **Commit** recycles the rejects and optionally moves the keepers to a folder of your
-  choice (e.g. pull the good shots off an SD card). One `Ctrl`+`Z` reverses the whole commit.
-  `K`/`X`/`U` flag files straight from the list too, so you can triage without ever leaving the
-  main list view
+  then one **Commit** applies everything. The commit has three independent switches: send rejects
+  to the Recycle Bin (on by default, or leave them in place), and move *or* copy the keepers to a
+  folder of your choice (e.g. pull the good shots off an SD card without touching it). One
+  `Ctrl`+`Z` reverses the whole commit. `K`/`X`/`U` flag files straight from the list too, so you
+  can triage without ever leaving the main list view
 - **Previews** — images render natively, videos play inline with a **scrub timeline** (play/pause,
   elapsed/total time, and a draggable slider to jump anywhere in the clip), audio shows a speaker
   so you know a file is selected and playing, PDFs render via the built-in Edge WebView2 viewer,
@@ -35,8 +36,9 @@ tour of the app — or jump straight to the
 - **Quick-use buttons** — build a name in one click from your own preset buttons (add them from the `+` under the rename box, manage them in **Settings**), plus two dynamic date buttons that insert today's date or the selected file's created date. The date formats are configurable in Settings using standard .NET date/time patterns (`yyyy-MM-dd`, `hh:mm tt`, …); the button row scrolls horizontally when it fills up
 - **Filter & sort** by name, size, date, or type — folders always listed first
 - **Automatic updates** — the app checks GitHub for a newer release on startup (toggleable in
-  Settings); when one ships, an update button appears in the toolbar and one click installs it
-  and restarts the app right where you were
+  Settings); when one ships, an update button appears in the toolbar. On an installed copy one
+  click downloads it, installs silently, and restarts the app right where you were; the portable
+  build opens the release page instead, since swapping a running loose exe isn't safe
 - Multi-select delete, open in Explorer, one-click context-menu install/uninstall from inside the app
 
 Planned work lives in the [issue tracker](https://github.com/JacobPoteet/ExplorerHelper/issues).
@@ -62,29 +64,41 @@ Requires the [.NET SDK](https://dotnet.microsoft.com/download) 8 or newer.
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip into artifacts/
-./build.ps1 -Version 0.4.0
+./build.ps1 -Version 0.5.0
 
 # Also compile the installer (requires Inno Setup 6: winget install JRSoftware.InnoSetup)
-./build.ps1 -Version 0.4.0 -Installer
+./build.ps1 -Version 0.5.0 -Installer
 ```
 
 ## Releasing
 
-CI builds every push and PR (`.github/workflows/ci.yml`). To cut a release:
+CI builds every push and PR (`.github/workflows/ci.yml`). To cut a release, bump `<Version>` in
+`src/ExplorerHelper/ExplorerHelper.csproj` and the `-Version` default in `build.ps1` to match, then
+tag:
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
-The release workflow builds the zip and installer with that version number and attaches
-both to a GitHub Release with generated notes.
+The release workflow derives the version from the tag, builds the zip and installer with it, and
+attaches both to a GitHub Release with generated notes.
+
+> The tag is what the shipped binaries carry, so a forgotten csproj bump doesn't break a release.
+> It does mean local builds report the stale number and see a permanent "update available" pill,
+> which is why the two should move together.
 
 ## Tech notes
 
 - **WPF on .NET 8** (`net8.0-windows`), MVVM via CommunityToolkit.Mvvm
+- Two projects: the app, plus `ExplorerHelper.ShellExtension`, an `IExplorerCommand` COM handler used
+  only by the optional Windows 11 sparse MSIX package
 - Thumbnails come from the Windows shell (`IShellItemImageFactory`) — the same images Explorer shows
-- Deletes go through `SHFileOperation` with `FOF_ALLOWUNDO`, so everything lands in the Recycle Bin
+- Media metadata in the preview details strip (resolution, length, frame rate, bit rate) is read from
+  the shell property store (`IPropertyStore`), so there's no codec dependency
+- Deletes go through `IFileOperation` with `FOF_ALLOWUNDO`, so everything lands in the Recycle Bin.
+  The operation's progress sink captures each item's `$R…` path inside the bin, which is what lets
+  in-app undo restore files without parsing the bin's localized columns
 - Context menu entries live under `HKCU\Software\Classes\Directory\shell` (and `Directory\Background\shell`)
 
 ## License

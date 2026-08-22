@@ -12,12 +12,17 @@ no admin required.
 
 Stack: WPF + [WPF-UI](https://github.com/lepoco/wpfui) (Fluent theme, `ui:` namespace),
 CommunityToolkit.Mvvm (source-generated `[ObservableProperty]` / `[RelayCommand]`),
-WebView2 (PDF preview). Dark theme is hard-set in `App.xaml`.
+WebView2 (PDF preview). Dark theme is hard-set in `App.xaml`, which also defines the keep/reject
+design tokens (mint `#3DD68C` / coral `#FF5C7C`); the violet accent `#7C5CFC` is applied separately
+in `App.xaml.cs` via `ApplicationAccentColorManager`, so changing brand colors means touching both.
 
 ## Build / run / test
 
 ```powershell
-# Build (CI uses the .sln in Release; dotnet 9 SDK on CI, but target is net8.0-windows)
+# Build both projects (dotnet 9 SDK on CI, but the target is net8.0-windows)
+# CI does NOT do this. It only runs build.ps1, which publishes the app csproj alone, so
+# ExplorerHelper.ShellExtension is never compiled by CI (issue #37). Build the .sln locally
+# before touching that project.
 dotnet build ExplorerHelper.sln -c Debug
 
 # Run — the first existing directory in args is the folder to open; with none, a folder picker shows
@@ -26,14 +31,22 @@ dotnet run --project src/ExplorerHelper -- "C:\some\folder"
 src/ExplorerHelper/bin/Debug/net8.0-windows/ExplorerHelper.exe "C:\some\folder"
 
 # Publish self-contained exe + portable zip into artifacts/ (also the CI smoke test)
-# (build.ps1 defaults -Version to the current release, 0.4.0)
-./build.ps1 -Version 0.4.0
-./build.ps1 -Version 0.4.0 -Installer   # also builds Inno Setup installer
+# build.ps1's -Version default and csproj <Version> both say 0.4.0; the newest tag is v0.5.0
+# (issue #33). Pass -Version explicitly until that's reconciled.
+./build.ps1 -Version 0.5.0
+./build.ps1 -Version 0.5.0 -Installer   # also builds Inno Setup installer
 ```
 
 There is **no test project**. Verify changes by driving the running app (see below).
 
 ## Architecture — where things live
+
+Two projects. `src/ExplorerHelper` is the app; `src/ExplorerHelper.ShellExtension` is a separate
+x64, framework-dependent COM handler (`IExplorerCommand`) used only by the optional Windows 11
+sparse MSIX (issue #11) — see `packaging/README.md`. No `ProjectReference` links them; the CLSID
+in `ExplorerHelperCommand`'s `[Guid]` and in `AppxManifest.xml` is the whole contract.
+
+Inside `src/ExplorerHelper`:
 
 - `src/ExplorerHelper/App.xaml.cs` — startup; picks the folder from args or a dialog. A global
   `DispatcherUnhandledException` handler shows a MessageBox but keeps running (so a silent crash
@@ -53,7 +66,13 @@ There is **no test project**. Verify changes by driving the running app (see bel
 - `Services/` — `AppSettings` (JSON persistence), `ContextMenuRegistrar` (registry entries),
   `RecycleBinService`, `ShellThumbnailService` (shell thumbnails), `ShellPropertyService`
   (media metadata via the shell property store), `UpdateService` (self-update from GitHub releases).
-- `Models/` — `FileEntry` (the list item), `TriageFlag`, `TypeFilter`, `PreviewDetail`.
+- `Models/` — `FileEntry` (the list item), `TriageFlag`, `TypeFilter`, and `PreviewDetail.cs`,
+  which holds three types: `PreviewDetailRow`, `PreviewDetailToggle`, and the `PreviewDetailKinds`
+  catalogue (the key list plus `DefaultEnabled`, which turns on 6 of the 8 details).
+- `CommitDialog.xaml(.cs)` — the triage commit dialog. Owns the three independent switches
+  (recycle rejects / move / copy, issue #23) and the session-remembered destination.
+- `RenameDialog.xaml(.cs)` — the F2 modal, with the Explorer-style stem pre-selection.
+- `Converters/InverseBoolToVisibilityConverter.cs` — used for empty-state hints bound to `HasItems`.
 
 ## Conventions that aren't obvious
 
@@ -62,7 +81,10 @@ There is **no test project**. Verify changes by driving the running app (see bel
 - **Preview file handles are released before disk ops.** A live `MediaElement`/WebView2 keeps the
   file open, so `Preview.Clear()` then `Dispatcher.BeginInvoke(DispatcherPriority.Background, …)`
   is used before delete/rename/move so the handle is freed first (issue #1). Follow this pattern
-  for any new code that mutates a file that might be previewing.
+  for any new code that mutates a file that might be previewing. `DeleteSelected`,
+  `ApplyQuickRename`, and `TriageView.Commit_Click` all do; `MainWindow.RenameSelected` (F2) is a
+  known gap (issue #31). The failure mode is a hang or an in-use error, not an exception you'll
+  see in a stack trace.
 - **Settings persistence:** user prefs live in `AppSettings` → `%APPDATA%\ExplorerHelper\settings.json`.
   It's forgiving of missing/corrupt files (falls back to defaults) and `Normalized()` fills in
   nulls from older files. New persisted settings: add a property, default it, and normalize it.
@@ -129,5 +151,8 @@ Notes:
 
 ## CI
 
-`.github/workflows/ci.yml` builds the solution in Release and runs `build.ps1` as a packaging
-smoke test on `windows-latest`. `release.yml` and `pages.yml` handle releases and the landing page.
+`.github/workflows/ci.yml` runs `build.ps1 -Version 0.0.0-ci` on `windows-latest` and uploads the
+zip. That publish is the *only* compile step, and it targets `src/ExplorerHelper/ExplorerHelper.csproj`
+by path, so **CI does not build `ExplorerHelper.ShellExtension`** (issue #37). A break there reaches
+`main` unnoticed. `release.yml` fires on `v*` tags, derives the version from the tag, and adds the
+Inno installer. `pages.yml` deploys `docs/` on changes under that path.
