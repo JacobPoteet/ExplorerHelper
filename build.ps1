@@ -7,7 +7,7 @@
 #>
 param(
     [string]$Configuration = 'Release',
-    [string]$Version = '0.5.0',
+    [string]$Version = '0.6.0',
     [switch]$Installer
 )
 

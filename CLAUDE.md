@@ -28,11 +28,11 @@ dotnet run --project src/ExplorerHelper -- "C:\some\folder"
 src/ExplorerHelper/bin/Debug/net8.0-windows/ExplorerHelper.exe "C:\some\folder"
 
 # Publish self-contained exe + portable zip into artifacts/ (also the CI smoke test)
-# build.ps1's -Version default and the csproj <Version> both track the newest tag (0.5.0).
+# build.ps1's -Version default and the csproj <Version> both track the newest tag (0.6.0).
 # Bump both when cutting a release — release.yml fails the build if they disagree with the tag,
 # because a lagging version makes every local build think an update is waiting (issue #33).
-./build.ps1 -Version 0.5.0
-./build.ps1 -Version 0.5.0 -Installer   # also builds Inno Setup installer
+./build.ps1 -Version 0.6.0
+./build.ps1 -Version 0.6.0 -Installer   # also builds Inno Setup installer
 ```
 
 There is **no test project**. Verify changes by driving the running app (see below).
