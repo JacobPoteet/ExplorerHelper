@@ -11,6 +11,38 @@
     <StackPanel>
         <ui:TitleBar Title="Commit triage" ShowMinimize="False" ShowMaximize="False" />
         <StackPanel Margin="16,4,16,16">
+            <!-- Scope (issue #43): marks accumulate across folders now, so a commit that would
+                 reach outside the folder on screen has to say so and offer to stay put. -->
+            <Border x:Name="ScopePanel" Padding="12,10" CornerRadius="8" Margin="0,0,0,10"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel>
+                    <TextBlock x:Name="ScopeHeading" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <RadioButton x:Name="ScopeAllRadio" GroupName="Scope" Margin="0,8,0,0"
+                                 IsChecked="True" Checked="Scope_Changed" />
+                    <RadioButton x:Name="ScopeFolderRadio" GroupName="Scope" Margin="0,4,0,0"
+                                 Checked="Scope_Changed" />
+                    <ItemsControl x:Name="FolderBreakdown" Margin="0,10,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,2">
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Counts}"
+                                               FontSize="11" Margin="8,0,0,0"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding Display}" FontSize="11"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Folder}"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
             <!-- Rejects card -->
             <Border Padding="12,10" CornerRadius="8"
                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"

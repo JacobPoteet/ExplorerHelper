@@ -7,6 +7,28 @@
              Focusable="True"
              PreviewKeyDown="Root_PreviewKeyDown">
     <UserControl.Resources>
+        <!-- Folder heading in the review piles. Only rendered once marks span more than one
+             folder: MainViewModel adds and removes the grouping to match (issue #43). -->
+        <Style x:Key="PileGroupStyle" TargetType="GroupItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupItem">
+                        <StackPanel Margin="0,0,0,6">
+                            <DockPanel Margin="6,4,6,4">
+                                <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
+                                           DockPanel.Dock="Right" FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </DockPanel>
+                            <ItemsPresenter />
+                        </StackPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Small thumbnail card used by both pile grids -->
         <DataTemplate x:Key="PileItemTemplate">
             <Border Width="132" Margin="4" Padding="6" CornerRadius="6"
@@ -263,6 +285,9 @@
                                         <WrapPanel />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
+                                <ItemsControl.GroupStyle>
+                                    <GroupStyle ContainerStyle="{StaticResource PileGroupStyle}" />
+                                </ItemsControl.GroupStyle>
                             </ItemsControl>
                         </ScrollViewer>
                     </DockPanel>
@@ -286,6 +311,9 @@
                                         <WrapPanel />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
+                                <ItemsControl.GroupStyle>
+                                    <GroupStyle ContainerStyle="{StaticResource PileGroupStyle}" />
+                                </ItemsControl.GroupStyle>
                             </ItemsControl>
                         </ScrollViewer>
                     </DockPanel>

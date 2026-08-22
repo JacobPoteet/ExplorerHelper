@@ -28,6 +28,17 @@ public sealed class AppSettings
     /// </summary>
     public List<string>? EnabledPreviewDetails { get; set; }
 
+    /// <summary>
+    /// Schema version of <see cref="EnabledPreviewDetails"/>, bumped whenever a new detail kind
+    /// ships. A settings file written before a kind existed can't have deliberately turned it off,
+    /// so <see cref="Normalized"/> switches it on once; without this the new row would stay hidden
+    /// on every existing install and read as a broken feature.
+    /// </summary>
+    public int PreviewDetailsVersion { get; set; }
+
+    /// <summary>Bump when adding a detail kind, and extend the migration in <see cref="Normalized"/>.</summary>
+    private const int CurrentPreviewDetailsVersion = 1;
+
     /// <summary>Check GitHub for a newer release on startup and offer a one-click update.
     /// Defaults to true (the initializer also covers settings files from older versions).</summary>
     public bool CheckForUpdates { get; set; } = true;
@@ -90,6 +101,12 @@ public sealed class AppSettings
         if (string.IsNullOrWhiteSpace(CreatedDateFormat))
             CreatedDateFormat = "yyyy-MM-dd";
         EnabledPreviewDetails ??= [.. PreviewDetailKinds.DefaultEnabled];
+
+        // v1 added the folder Items row (issue #40).
+        if (PreviewDetailsVersion < 1 && !EnabledPreviewDetails.Contains(PreviewDetailKinds.Items))
+            EnabledPreviewDetails.Add(PreviewDetailKinds.Items);
+        PreviewDetailsVersion = CurrentPreviewDetailsVersion;
+
         return this;
     }
 }

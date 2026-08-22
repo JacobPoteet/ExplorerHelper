@@ -37,6 +37,7 @@ public static class PreviewDetailKinds
 {
     public const string Type = "Type";
     public const string Size = "Size";
+    public const string Items = "Items";
     public const string Dimensions = "Dimensions";
     public const string Duration = "Duration";
     public const string FrameRate = "FrameRate";
@@ -49,6 +50,7 @@ public static class PreviewDetailKinds
     [
         (Type, "Type"),
         (Size, "Size"),
+        (Items, "Items"),
         (Dimensions, "Resolution"),
         (Duration, "Length"),
         (FrameRate, "Frame rate"),
@@ -59,5 +61,5 @@ public static class PreviewDetailKinds
 
     /// <summary>Detail types shown by default (frame rate and bit rate start off — niche).</summary>
     public static readonly string[] DefaultEnabled =
-        [Type, Size, Dimensions, Duration, Created, Modified];
+        [Type, Size, Items, Dimensions, Duration, Created, Modified];
 }

@@ -106,6 +106,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -150,6 +151,26 @@
                            Command="{Binding ApplyUpdateCommand}"
                            Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibility}}"
                            ToolTip="A new version is ready — click to update; the app restarts on this folder" />
+                <!-- Pending marks (issue #43): marks survive navigation now, so this stays put
+                     while you browse. Without it you can commit a reject made six folders ago. -->
+                <Border Margin="0,0,12,0" Padding="10,4" CornerRadius="12"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        ToolTip="Uncommitted keep/reject marks. They follow you between folders until you commit or discard them."
+                        Visibility="{Binding HasPendingMarks, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding PendingMarksSummary}" FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Button Content="Discard" Click="DiscardMarks_Click" Margin="8,0,0,0"
+                                Padding="6,0" Background="Transparent" BorderThickness="0"
+                                FontSize="11" Cursor="Hand"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                ToolTip="Clear every pending mark without touching the disk" />
+                    </StackPanel>
+                </Border>
                 <ui:Button Appearance="Primary"
                            Content="Triage" Icon="{ui:SymbolIcon Stack24}"
                            Click="Triage_Click"
@@ -310,8 +331,51 @@
             </Popup>
         </Grid>
 
+        <!-- Location bar (issue #41): back/forward/up plus a clickable breadcrumb. -->
+        <Grid Grid.Row="2" Margin="12,0,12,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button Icon="{ui:SymbolIcon ArrowLeft24}" Padding="8,4"
+                           Command="{Binding NavigateBackCommand}"
+                           ToolTip="Back (Alt+Left)" />
+                <ui:Button Margin="4,0,0,0" Icon="{ui:SymbolIcon ArrowRight24}" Padding="8,4"
+                           Command="{Binding NavigateForwardCommand}"
+                           ToolTip="Forward (Alt+Right)" />
+                <ui:Button Margin="4,0,8,0" Icon="{ui:SymbolIcon ArrowUp24}" Padding="8,4"
+                           Command="{Binding NavigateUpCommand}"
+                           ToolTip="Up one folder (Alt+Up or Backspace)" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled" VerticalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Breadcrumbs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="{Binding Label}" Tag="{Binding Path}"
+                                        Click="Breadcrumb_Click"
+                                        Padding="8,3" Background="Transparent" BorderThickness="0"
+                                        FontSize="13" Cursor="Hand" />
+                                <TextBlock Text="›" VerticalAlignment="Center" FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
         <!-- Main split: file list | preview -->
-        <Grid Grid.Row="2" Margin="12,0,12,0">
+        <Grid Grid.Row="3" Margin="12,0,12,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*" MinWidth="380" />
                 <ColumnDefinition Width="Auto" />
@@ -582,7 +646,7 @@
         </Grid>
 
         <!-- Status bar: status on the left, shortcut hints as keyboard-key chips on the right -->
-        <DockPanel Grid.Row="3" Margin="14,8,14,10">
+        <DockPanel Grid.Row="4" Margin="14,8,14,10">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <Border Style="{StaticResource KbdChip}">
                     <TextBlock Style="{StaticResource KbdText}" Text="Del" />
@@ -610,7 +674,7 @@
         </DockPanel>
 
         <!-- Triage overlay: covers everything below the title bar while swiping/reviewing -->
-        <controls:TriageView x:Name="TriageOverlay" Grid.Row="1" Grid.RowSpan="3"
+        <controls:TriageView x:Name="TriageOverlay" Grid.Row="1" Grid.RowSpan="4"
                              Visibility="Collapsed" />
     </Grid>
 </ui:FluentWindow>

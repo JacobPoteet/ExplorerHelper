@@ -147,12 +147,34 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    partial void OnSelectedFileChanged(FileEntry? value)
+    partial void OnSelectedFileChanged(FileEntry? oldValue, FileEntry? newValue)
     {
+        // A folder's size and item count land seconds after the selection does, so follow the
+        // selected entry's own notifications to keep the details rows current (issue #40).
+        if (oldValue is not null)
+            oldValue.PropertyChanged -= OnSelectedEntryPropertyChanged;
+        if (newValue is not null)
+            newValue.PropertyChanged += OnSelectedEntryPropertyChanged;
+
         // New selection: drop stale media metadata, show what we know instantly, fetch the rest.
         _currentMedia = null;
         RebuildPreviewDetails();
-        LoadMediaPropertiesInBackground(value);
+        LoadMediaPropertiesInBackground(newValue);
+    }
+
+    /// <summary>
+    /// Refreshes the details rows when the selected folder's scan reports a number. The scan runs
+    /// on a worker, so this hops to the UI thread before touching the bound collection.
+    /// </summary>
+    private void OnSelectedEntryPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(FileEntry.SizeDisplay) or nameof(FileEntry.ItemsDisplay)))
+            return;
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            RebuildPreviewDetails();
+        else
+            dispatcher.BeginInvoke(RebuildPreviewDetails);
     }
 
     private void OnPreviewDetailToggleChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -212,7 +234,8 @@ public partial class MainViewModel : ObservableObject
     private static string? FormatDetail(string key, FileEntry entry, ShellPropertyService.MediaProperties? media) => key switch
     {
         PreviewDetailKinds.Type => entry.TypeDisplay,
-        PreviewDetailKinds.Size => entry.IsDirectory ? null : entry.SizeDisplay,
+        PreviewDetailKinds.Size => entry.SizeDisplay,
+        PreviewDetailKinds.Items => entry.ItemsDisplay,
         PreviewDetailKinds.Dimensions => media?.Dimensions is { } d ? $"{d.Width} × {d.Height}" : null,
         PreviewDetailKinds.Duration => media?.Duration is { } t ? FormatDuration(t) : null,
         PreviewDetailKinds.FrameRate => media?.FrameRate is { } f ? $"{f:0.##} fps" : null,
@@ -293,11 +316,49 @@ public partial class MainViewModel : ObservableObject
     // Flags live on the entries; these piles/counts are derived views kept in sync by
     // RecomputeTriage so the deck header, review screen, and status bar can bind to them.
 
-    /// <summary>Files currently flagged Keep, in folder order.</summary>
+    /// <summary>
+    /// Every mark made this session, keyed by path so it survives navigating to another folder
+    /// (issue #43). The piles below are derived views onto it.
+    /// </summary>
+    private readonly TriageSession _triage = new();
+
+    /// <summary>Files currently flagged Keep, folder then name.</summary>
     public ObservableCollection<FileEntry> KeepPile { get; } = [];
 
-    /// <summary>Files currently flagged Reject, in folder order.</summary>
+    /// <summary>Files currently flagged Reject, folder then name.</summary>
     public ObservableCollection<FileEntry> RejectPile { get; } = [];
+
+    /// <summary>Toolbar text while marks are pending, e.g. "37 marks in 5 folders".</summary>
+    [ObservableProperty]
+    private string _pendingMarksSummary = string.Empty;
+
+    /// <summary>
+    /// True while uncommitted marks exist, showing the toolbar pill. Marks now accumulate across
+    /// folders, so something has to stay visible while you browse or you can commit a reject you
+    /// made six folders ago and forgot about.
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasPendingMarks;
+
+    /// <summary>True once marks span more than one folder, which is when scope starts to matter.</summary>
+    [ObservableProperty]
+    private bool _marksSpanFolders;
+
+    /// <summary>Keep/reject totals for one folder, shown in the commit dialog's breakdown.</summary>
+    public sealed record TriageFolderSummary(string Folder, string Display, int KeepCount, int RejectCount);
+
+    /// <summary>Pending marks grouped by the folder they were made in, for the commit dialog.</summary>
+    public List<TriageFolderSummary> SummarizeMarksByFolder() => _triage.Marked
+        .GroupBy(TriageSession.FolderOf, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+        .Select(g => new TriageFolderSummary(
+            g.Key,
+            string.Equals(g.Key, FolderPath, StringComparison.OrdinalIgnoreCase)
+                ? $"{Path.GetFileName(g.Key)} (current folder)"
+                : g.Key,
+            g.Count(e => e.Flag == TriageFlag.Keep),
+            g.Count(e => e.Flag == TriageFlag.Reject)))
+        .ToList();
 
     [ObservableProperty]
     private int _keepCount;
@@ -358,6 +419,7 @@ public partial class MainViewModel : ObservableObject
 
     private List<FileEntry> _allEntries = [];
     private CancellationTokenSource? _thumbnailCts;
+    private CancellationTokenSource? _folderStatsCts;
 
     partial void OnFilterTextChanged(string value) => ApplyView();
 
@@ -377,18 +439,138 @@ public partial class MainViewModel : ObservableObject
         ApplyView();
     }
 
+    // --- Navigation (issue #41) --------------------------------------------------------
+    // Entering a subfolder used to mean handing the path to explorer.exe and leaving the app.
+    // These two stacks are the browser model: NavigateTo pushes where you were, Back and Forward
+    // move between them without disturbing each other's history.
+
+    private readonly Stack<string> _backStack = new();
+    private readonly Stack<string> _forwardStack = new();
+
+    /// <summary>Last selected item per folder, so Up then Enter lands where you left off.</summary>
+    private readonly Dictionary<string, string> _lastSelectedByFolder = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>One clickable path segment in the breadcrumb bar.</summary>
+    public sealed record BreadcrumbSegment(string Label, string Path);
+
+    /// <summary>The current folder split into clickable segments, root first.</summary>
+    public ObservableCollection<BreadcrumbSegment> Breadcrumbs { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NavigateBackCommand))]
+    private bool _canGoBack;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NavigateForwardCommand))]
+    private bool _canGoForward;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NavigateUpCommand))]
+    private bool _canGoUp;
+
+    /// <summary>
+    /// Raised just before the folder switches, so the view can drop preview file handles first.
+    /// A live MediaElement or WebView2 holds the outgoing file open (issue #1).
+    /// </summary>
+    public event EventHandler? FolderChanging;
+
+    /// <summary>Enters a folder, remembering the current one so Back returns to it.</summary>
+    public void NavigateTo(string path)
+    {
+        if (!Directory.Exists(path) || string.Equals(path, FolderPath, StringComparison.OrdinalIgnoreCase))
+            return;
+        FolderChanging?.Invoke(this, EventArgs.Empty);
+        RememberSelection();
+        if (!string.IsNullOrEmpty(FolderPath))
+            _backStack.Push(FolderPath);
+        // A new destination ends the forward trail, the same way a browser does it.
+        _forwardStack.Clear();
+        LoadFolder(path);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
+    private void NavigateBack() => Step(_backStack, _forwardStack);
+
+    [RelayCommand(CanExecute = nameof(CanGoForward))]
+    private void NavigateForward() => Step(_forwardStack, _backStack);
+
+    /// <summary>Moves one entry off <paramref name="from"/>, pushing the current folder onto the other.</summary>
+    private void Step(Stack<string> from, Stack<string> to)
+    {
+        if (from.Count == 0)
+            return;
+        FolderChanging?.Invoke(this, EventArgs.Empty);
+        RememberSelection();
+        var target = from.Pop();
+        if (!string.IsNullOrEmpty(FolderPath))
+            to.Push(FolderPath);
+        // A folder deleted while it sat in the history would otherwise leave the view stranded.
+        if (Directory.Exists(target))
+            LoadFolder(target);
+        else
+            UpdateNavigationState();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanGoUp))]
+    private void NavigateUp()
+    {
+        if (ParentFolder is { } parent)
+            NavigateTo(parent);
+    }
+
+    /// <summary>The containing folder, or null at a drive root.</summary>
+    private string? ParentFolder =>
+        string.IsNullOrEmpty(FolderPath) ? null : Path.GetDirectoryName(FolderPath);
+
+    private void RememberSelection()
+    {
+        if (!string.IsNullOrEmpty(FolderPath) && SelectedFile is { } selected)
+            _lastSelectedByFolder[FolderPath] = selected.FullPath;
+    }
+
+    private void UpdateNavigationState()
+    {
+        CanGoBack = _backStack.Count > 0;
+        CanGoForward = _forwardStack.Count > 0;
+        CanGoUp = ParentFolder is { Length: > 0 };
+    }
+
+    /// <summary>Rebuilds the breadcrumb from the current path, root segment first.</summary>
+    private void BuildBreadcrumbs()
+    {
+        Breadcrumbs.Clear();
+        if (string.IsNullOrEmpty(FolderPath))
+            return;
+
+        var segments = new List<BreadcrumbSegment>();
+        var current = FolderPath;
+        while (!string.IsNullOrEmpty(current))
+        {
+            // A drive or UNC root has no file name of its own, so it labels itself ("C:\").
+            var label = Path.GetFileName(current);
+            segments.Add(new BreadcrumbSegment(
+                string.IsNullOrEmpty(label) ? current : label, current));
+            var parent = Path.GetDirectoryName(current);
+            if (parent is null || string.Equals(parent, current, StringComparison.OrdinalIgnoreCase))
+                break;
+            current = parent;
+        }
+
+        segments.Reverse();
+        foreach (var segment in segments)
+            Breadcrumbs.Add(segment);
+    }
+
     public void LoadFolder(string path)
     {
         if (!Directory.Exists(path))
             return;
 
-        FolderPath = path;
+        // Refresh and Undo reload the folder you're already in; only an actual move should
+        // restore a remembered selection or reset where the list is scrolled.
+        var enteringNewFolder = !string.Equals(path, FolderPath, StringComparison.OrdinalIgnoreCase);
 
-        // Triage flags must survive a reload (Undo and Refresh both rebuild the list),
-        // so carry them across by path.
-        var previousFlags = _allEntries
-            .Where(e => e.Flag != TriageFlag.None)
-            .ToDictionary(e => e.FullPath, e => e.Flag, StringComparer.OrdinalIgnoreCase);
+        FolderPath = path;
 
         var dir = new DirectoryInfo(path);
         _allEntries = dir.EnumerateDirectories()
@@ -397,19 +579,42 @@ public partial class MainViewModel : ObservableObject
             .Select(info => new FileEntry(info))
             .ToList();
 
-        foreach (var entry in _allEntries)
-            if (previousFlags.TryGetValue(entry.FullPath, out var flag))
-                entry.Flag = flag;
+        // Marks are keyed by path and live in the session, so they survive a reload *and* a trip
+        // through other folders. Rebinding also swaps the piles onto these fresh entry objects.
+        _triage.Rebind(_allEntries);
 
         BuildTypeFilters();
         RecomputeTriage();
         ApplyView();
+        BuildBreadcrumbs();
+        UpdateNavigationState();
+
+        if (enteringNewFolder)
+            RestoreRememberedSelection(path);
+
+        LoadFolderSizesInBackground();
         LoadThumbnailsInBackground();
+    }
+
+    /// <summary>
+    /// Re-selects whatever was selected the last time this folder was open, so stepping Up and
+    /// back down doesn't dump you at the top of the list. Falls back to the first row.
+    /// </summary>
+    private void RestoreRememberedSelection(string path)
+    {
+        if (_lastSelectedByFolder.TryGetValue(path, out var remembered))
+        {
+            SelectedFile = Files.FirstOrDefault(
+                f => string.Equals(f.FullPath, remembered, StringComparison.OrdinalIgnoreCase));
+        }
+        SelectedFile ??= Files.FirstOrDefault();
     }
 
     [RelayCommand]
     private void Refresh()
     {
+        // Refresh means "re-read the disk", so cached subtree totals go too (issue #40).
+        FolderScanService.ClearCache();
         if (!string.IsNullOrEmpty(FolderPath))
             LoadFolder(FolderPath);
     }
@@ -461,6 +666,9 @@ public partial class MainViewModel : ObservableObject
             // shell doesn't always report it; without one the file is simply not undoable (issue #32).
             if (result.RecycledPath is { } recycled)
                 restorable.Add((entry.FullPath, recycled));
+            FolderScanService.Invalidate(entry.FullPath);
+            // A deleted file can't be committed later, so its mark goes with it.
+            _triage.Forget(entry.FullPath);
             Files.Remove(entry);
             _allEntries.Remove(entry);
         }
@@ -485,52 +693,73 @@ public partial class MainViewModel : ObservableObject
     {
         if (entry.IsDirectory || entry.Flag == flag)
             return;
-        entry.Flag = flag;
+        _triage.Set(entry, flag);
         RecomputeTriage();
     }
 
-    /// <summary>Discards every triage mark (used when the user exits without committing).</summary>
+    /// <summary>Discards every triage mark, in every folder (used when exiting without committing).</summary>
     public void ClearAllFlags()
     {
-        foreach (var entry in _allEntries)
-            entry.Flag = TriageFlag.None;
+        _triage.Clear();
         RecomputeTriage();
     }
 
-    /// <summary>Rebuilds the derived piles/counts from the entries' flags.</summary>
+    /// <summary>Rebuilds the derived piles and counts from the session's marks.</summary>
     private void RecomputeTriage()
     {
         KeepPile.Clear();
         RejectPile.Clear();
         long keepBytes = 0, rejectBytes = 0;
-        var unmarked = 0;
 
-        foreach (var entry in _allEntries)
+        foreach (var entry in _triage.Pending(TriageFlag.Keep))
         {
-            if (entry.IsDirectory)
-                continue;
-            switch (entry.Flag)
-            {
-                case TriageFlag.Keep:
-                    KeepPile.Add(entry);
-                    keepBytes += entry.SizeBytes;
-                    break;
-                case TriageFlag.Reject:
-                    RejectPile.Add(entry);
-                    rejectBytes += entry.SizeBytes;
-                    break;
-                default:
-                    unmarked++;
-                    break;
-            }
+            KeepPile.Add(entry);
+            keepBytes += entry.SizeBytes;
         }
+        foreach (var entry in _triage.Pending(TriageFlag.Reject))
+        {
+            RejectPile.Add(entry);
+            rejectBytes += entry.SizeBytes;
+        }
+
+        // "Still to decide" stays a question about the folder in front of you, not the whole session.
+        var unmarked = _allEntries.Count(e => !e.IsDirectory && e.Flag == TriageFlag.None);
 
         KeepCount = KeepPile.Count;
         RejectCount = RejectPile.Count;
         UnmarkedFileCount = unmarked;
         KeepPileSummary = $"{KeepCount} · {FileEntry.FormatSize(keepBytes)}";
         RejectPileSummary = $"{RejectCount} · {FileEntry.FormatSize(rejectBytes)}";
+
+        var total = KeepCount + RejectCount;
+        var folders = _triage.FolderCount;
+        HasPendingMarks = total > 0;
+        MarksSpanFolders = folders > 1;
+        PendingMarksSummary = folders > 1
+            ? $"{total} mark{(total == 1 ? "" : "s")} in {folders} folders"
+            : $"{total} mark{(total == 1 ? "" : "s")}";
+        UpdatePileGrouping();
         UpdateStatus();
+    }
+
+    /// <summary>
+    /// Groups the review piles by folder once marks span more than one, and drops the grouping
+    /// again when they don't - a lone "Photos" header over every item is noise in the common case.
+    /// </summary>
+    private void UpdatePileGrouping()
+    {
+        Apply(System.Windows.Data.CollectionViewSource.GetDefaultView(KeepPile));
+        Apply(System.Windows.Data.CollectionViewSource.GetDefaultView(RejectPile));
+
+        void Apply(System.ComponentModel.ICollectionView view)
+        {
+            if (view.GroupDescriptions is not { } groups)
+                return;
+            if (MarksSpanFolders && groups.Count == 0)
+                groups.Add(new System.Windows.Data.PropertyGroupDescription(nameof(FileEntry.FolderName)));
+            else if (!MarksSpanFolders && groups.Count > 0)
+                groups.Clear();
+        }
     }
 
     /// <summary>
@@ -539,12 +768,20 @@ public partial class MainViewModel : ObservableObject
     /// auto-number). Pushes a single undo entry that reverses the whole commit. Returns an
     /// error summary, or null when every file was processed.
     /// </summary>
-    public string? CommitTriage(string? keepDestination, bool copyKeepers, bool deleteRejects)
+    public string? CommitTriage(
+        string? keepDestination,
+        bool copyKeepers,
+        bool deleteRejects,
+        bool currentFolderOnly = false)
     {
-        var rejects = _allEntries.Where(e => !e.IsDirectory && e.Flag == TriageFlag.Reject).ToList();
-        var keeps = _allEntries.Where(e => !e.IsDirectory && e.Flag == TriageFlag.Keep).ToList();
+        // Marks come from the session, not the current folder, so a commit can span everything
+        // decided this run (issue #43). currentFolderOnly narrows it back to what's on screen.
+        var scope = currentFolderOnly ? FolderPath : null;
+        var rejects = _triage.Pending(TriageFlag.Reject, scope);
+        var keeps = _triage.Pending(TriageFlag.Keep, scope);
 
         var failures = 0;
+        var committed = new List<string>();
 
         var recycled = new List<(string Original, string Recycled)>();
         var rejectsDeleted = 0; // includes files the shell deleted without reporting a bin path
@@ -563,6 +800,7 @@ public partial class MainViewModel : ObservableObject
                 }
 
                 rejectsDeleted++;
+                committed.Add(entry.FullPath);
                 if (result.RecycledPath is { } binPath)
                     recycled.Add((entry.FullPath, binPath));
             }
@@ -602,6 +840,7 @@ public partial class MainViewModel : ObservableObject
                         File.Move(entry.FullPath, target); // handles cross-volume (SD card → disk)
                         moved.Add((entry.FullPath, target));
                     }
+                    committed.Add(entry.FullPath);
                 }
                 catch
                 {
@@ -620,9 +859,26 @@ public partial class MainViewModel : ObservableObject
             PushUndo(label, () => ReverseCommit(moved, recycled, copied));
         }
 
-        // The session is done — clear every flag before the reload so none carry over.
-        foreach (var entry in _allEntries)
-            entry.Flag = TriageFlag.None;
+        // Recycling and moving both change what the source and destination trees add up to, and
+        // the sources can now be several folders (issue #43).
+        foreach (var folder in rejects.Concat(keeps)
+                     .Select(TriageSession.FolderOf)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+            FolderScanService.Invalidate(folder);
+        if (!string.IsNullOrWhiteSpace(keepDestination))
+            FolderScanService.Invalidate(keepDestination);
+
+        // Only the marks this commit actually acted on are cleared. A keeper left in place because
+        // no destination was set, or a reject the shell refused, is still pending and must stay
+        // marked rather than being silently dropped.
+        foreach (var path in committed)
+            _triage.Forget(path);
+        if (!deleteRejects && string.IsNullOrWhiteSpace(keepDestination))
+        {
+            // Nothing was asked of the disk at all: treat it as the user clearing the decisions.
+            foreach (var entry in rejects.Concat(keeps))
+                _triage.Set(entry, TriageFlag.None);
+        }
         LoadFolder(FolderPath);
 
         var summaryParts = new List<string>();
@@ -683,6 +939,7 @@ public partial class MainViewModel : ObservableObject
         CanUndo = _undoStack.Count > 0;
 
         var error = op.Reverse();
+        FolderScanService.ClearCache(); // an undo can move or restore anything, anywhere
 
         if (!string.IsNullOrEmpty(FolderPath))
             LoadFolder(FolderPath); // rebuilds the list; UpdateStatus runs inside
@@ -749,6 +1006,8 @@ public partial class MainViewModel : ObservableObject
         // Point the entry at its new path before reloading. Refresh() carries triage flags across
         // by path, so a stale FullPath here would key the snapshot on the old name and silently
         // drop the file's keep/reject flag (issue #30).
+        // The mark is keyed by path, so it has to follow the file (issue #30 for the reload case).
+        _triage.Rename(oldPath, newPath);
         entry.UpdatePath(newPath);
         PushUndo($"rename to “{newName}”", () => ReverseRename(newPath, oldPath, wasDir));
         Refresh();
@@ -807,6 +1066,7 @@ public partial class MainViewModel : ObservableObject
             return ex.Message;
         }
 
+        _triage.Rename(oldPath, targetPath);
         entry.UpdatePath(targetPath);
         PushUndo($"rename to “{targetName}”", () => ReverseRename(targetPath, oldPath, wasDir));
         UpdateStatus();
@@ -930,8 +1190,8 @@ public partial class MainViewModel : ObservableObject
         ordered = SortMode switch
         {
             "Size" => SortDescending
-                ? ordered.ThenByDescending(f => f.SizeBytes)
-                : ordered.ThenBy(f => f.SizeBytes),
+                ? ordered.ThenByDescending(f => f.SortSizeBytes)
+                : ordered.ThenBy(f => f.SortSizeBytes),
             "Date" => SortDescending
                 ? ordered.ThenByDescending(f => f.Modified)
                 : ordered.ThenBy(f => f.Modified),
@@ -960,6 +1220,66 @@ public partial class MainViewModel : ObservableObject
             ? $" · triage: ✓ {KeepCount} keep, ✗ {RejectCount} reject"
             : string.Empty;
         StatusText = $"{files} files, {folders} folders — {FileEntry.FormatSize(totalSize)}{triage}";
+    }
+
+    /// <summary>
+    /// Measures every folder in the list so the Size column shows what each one actually holds
+    /// (issue #40), in two phases because the two numbers cost wildly different amounts.
+    /// <para>
+    /// Phase 1 counts direct children, well under a millisecond each, so selecting a folder shows
+    /// a number immediately. Phase 2 walks each subtree for its byte total, which runs from
+    /// milliseconds to seconds depending on what's down there; it reports partial totals as it
+    /// goes, so a large folder counts up in place instead of sitting blank.
+    /// </para>
+    /// Reparse points are skipped: a junction's bytes belong to its target, and counting them
+    /// here would report them twice in the same column.
+    /// </summary>
+    private void LoadFolderSizesInBackground()
+    {
+        _folderStatsCts?.Cancel();
+        _folderStatsCts = new CancellationTokenSource();
+        var token = _folderStatsCts.Token;
+        var folders = _allEntries.Where(e => e.IsDirectory && !e.IsReparsePoint).ToList();
+        if (folders.Count == 0)
+            return;
+
+        Task.Run(() =>
+        {
+            // Same cross-thread property set the thumbnail pass uses — WPF marshals the change
+            // notification to the UI thread for a plain (non-collection) property.
+            foreach (var entry in folders)
+            {
+                if (token.IsCancellationRequested)
+                    return;
+                entry.ChildCount = FolderScanService.CountChildren(entry.FullPath);
+            }
+
+            try
+            {
+                // Bounded, so one enormous subfolder can't hold up the rest of the column, and so
+                // opening a folder full of folders doesn't put the disk under dozens of walks.
+                Parallel.ForEach(
+                    folders,
+                    new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = token },
+                    entry =>
+                    {
+                        entry.IsScanning = true;
+                        try
+                        {
+                            entry.FolderStats = FolderScanService.Scan(
+                                entry.FullPath, token, partial => entry.FolderStats = partial);
+                        }
+                        finally
+                        {
+                            entry.IsScanning = false;
+                        }
+                    });
+            }
+            catch (OperationCanceledException)
+            {
+                // Navigating away or refreshing mid-scan is routine, not a failure.
+            }
+        }, token);
     }
 
     private void LoadThumbnailsInBackground()

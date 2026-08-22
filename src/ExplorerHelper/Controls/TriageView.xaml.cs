@@ -56,24 +56,12 @@ public partial class TriageView : UserControl
     }
 
     /// <summary>
-    /// User-initiated exit (Exit button or Esc). Marks live only for the session, so warn
-    /// before throwing them away — then discard so the "progress will be lost" message is true.
+    /// User-initiated exit (Exit button or Esc). Leaving the deck no longer throws the marks away:
+    /// they live in the session and follow you between folders (issue #43), so closing here is
+    /// just putting the deck down. The toolbar pill keeps the pending count in view, and discarding
+    /// is the explicit button next to it.
     /// </summary>
-    private void RequestExit()
-    {
-        if (_vm.KeepCount + _vm.RejectCount > 0)
-        {
-            var result = MessageBox.Show(
-                Window.GetWindow(this)!,
-                "Exit triage and discard your marks?\n\nYour keep and reject decisions haven't been committed yet — they won't be saved.",
-                "Discard triage progress?",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
-            if (result != MessageBoxResult.Yes)
-                return;
-            _vm.ClearAllFlags();
-        }
-        Close();
-    }
+    private void RequestExit() => Close();
 
     private void Close()
     {
@@ -385,9 +373,18 @@ public partial class TriageView : UserControl
 
     private void Commit_Click(object sender, RoutedEventArgs e)
     {
-        var keepBytes = _vm.KeepPile.Sum(f => f.SizeBytes);
-        var rejectBytes = _vm.RejectPile.Sum(f => f.SizeBytes);
-        var dialog = new CommitDialog(_vm.RejectCount, rejectBytes, _vm.KeepCount, keepBytes)
+        // Marks can span folders now (issue #43), so the dialog gets the per-folder breakdown and
+        // a way to recompute its totals when the user narrows the scope.
+        var dialog = new CommitDialog(
+            _vm.SummarizeMarksByFolder(),
+            _vm.FolderPath,
+            onlyHere =>
+            {
+                var rejects = _vm.RejectPile.Where(f => InScope(f, onlyHere)).ToList();
+                var keeps = _vm.KeepPile.Where(f => InScope(f, onlyHere)).ToList();
+                return (rejects.Count, rejects.Sum(f => f.SizeBytes),
+                        keeps.Count, keeps.Sum(f => f.SizeBytes));
+            })
         {
             Owner = Window.GetWindow(this),
         };
@@ -396,13 +393,18 @@ public partial class TriageView : UserControl
         var destination = dialog.KeepDestination;
         var copyKeepers = dialog.CopyKeepers;
         var deleteRejects = dialog.DeleteRejects;
+        var currentFolderOnly = dialog.CurrentFolderOnly;
+
+        bool InScope(Models.FileEntry entry, bool onlyHere) =>
+            !onlyHere || string.Equals(
+                Services.TriageSession.FolderOf(entry), _vm.FolderPath, StringComparison.OrdinalIgnoreCase);
 
         // Release every preview handle, then let the dispatcher pump the media teardown
         // before files start moving — same discipline as delete/rename (issue #1).
         CardPreview.Clear();
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
         {
-            var error = _vm.CommitTriage(destination, copyKeepers, deleteRejects);
+            var error = _vm.CommitTriage(destination, copyKeepers, deleteRejects, currentFolderOnly);
             if (error is not null)
                 MessageBox.Show(Window.GetWindow(this)!, error, "Commit finished with errors",
                     MessageBoxButton.OK, MessageBoxImage.Warning);

@@ -49,9 +49,11 @@ Inside `src/ExplorerHelper`:
 - `src/ExplorerHelper/App.xaml.cs` — startup; picks the folder from args or a dialog. A global
   `DispatcherUnhandledException` handler shows a MessageBox but keeps running (so a silent crash
   still leaves the window up — check for an error dialog when verifying).
-- `MainWindow.xaml(.cs)` — the shell: toolbar, the file `ListView` (custom-retemplated GridView),
-  the right column (preview → details strip → quick-rename bar), and the Settings popup. Most
-  view logic (sorting indicators, quick-rename flow, keyboard triage) is in the code-behind.
+- `MainWindow.xaml(.cs)` — the shell: toolbar, the location bar (back/forward/up + breadcrumb),
+  the file `ListView` (custom-retemplated GridView), the right column (preview → details strip →
+  quick-rename bar), and the Settings popup. Most view logic (sorting indicators, quick-rename
+  flow, keyboard triage, navigation) is in the code-behind. Root grid rows are title bar, toolbar,
+  location bar, split, status bar — add a row and every `Grid.Row` below it shifts.
 - `ViewModels/MainViewModel.cs` — the bulk of the logic: folder loading, filtering/sorting,
   triage piles, undo journal, quick-rename, and preview-details computation. Uses
   `[ObservableProperty]`; partial hooks like `OnSelectedFileChanged(value)` are how selection
@@ -63,10 +65,12 @@ Inside `src/ExplorerHelper`:
   Hosts its own `PreviewPane` (`CardPreview`).
 - `Services/` — `AppSettings` (JSON persistence), `ContextMenuRegistrar` (registry entries),
   `RecycleBinService`, `ShellThumbnailService` (shell thumbnails), `ShellPropertyService`
-  (media metadata via the shell property store), `UpdateService` (self-update from GitHub releases).
+  (media metadata via the shell property store), `UpdateService` (self-update from GitHub releases),
+  `FolderScanService` (folder item counts and subtree sizes), `TriageSession` (keep/reject marks,
+  keyed by path so they outlive the folder they were made in).
 - `Models/` — `FileEntry` (the list item), `TriageFlag`, `TypeFilter`, and `PreviewDetail.cs`,
   which holds three types: `PreviewDetailRow`, `PreviewDetailToggle`, and the `PreviewDetailKinds`
-  catalogue (the key list plus `DefaultEnabled`, which turns on 6 of the 8 details).
+  catalogue (the key list plus `DefaultEnabled`, which turns on 7 of the 9 details).
 - `CommitDialog.xaml(.cs)` — the triage commit dialog. Owns the three independent switches
   (recycle rejects / move / copy, issue #23) and the session-remembered destination.
 - `RenameDialog.xaml(.cs)` — the F2 modal, with the Explorer-style stem pre-selection.
@@ -82,7 +86,9 @@ Inside `src/ExplorerHelper`:
   for any new code that mutates a file that might be previewing. `DeleteSelected`,
   `ApplyQuickRename`, and `TriageView.Commit_Click` all do; `MainWindow.RenameSelected` (F2) is a
   known gap (issue #31). The failure mode is a hang or an in-use error, not an exception you'll
-  see in a stack trace.
+  see in a stack trace. Navigation is covered centrally: `MainViewModel.FolderChanging` fires
+  before every folder switch and `MainWindow` clears the preview on it, so command-bound toolbar
+  buttons and code-behind paths both release handles without each remembering to.
 - **Settings persistence:** user prefs live in `AppSettings` → `%APPDATA%\ExplorerHelper\settings.json`.
   It's forgiving of missing/corrupt files (falls back to defaults) and `Normalized()` fills in
   nulls from older files. New persisted settings: add a property, default it, and normalize it.
@@ -92,9 +98,40 @@ Inside `src/ExplorerHelper`:
 - **PROPVARIANT interop** (`ShellPropertyService`): the struct uses two `IntPtr` union slots so it's
   the right size on x86 and x64; values are coerced with the `propsys.dll` `PropVariantToXxx` helpers
   rather than parsing the union by hand. Always `PropVariantClear` after reading.
-- **Background work** (thumbnails, media metadata) runs on `Task.Run` with a `CancellationTokenSource`
-  that's cancelled when the selection changes; results are marshalled back via
+- **Background work** (thumbnails, media metadata, folder child counts) runs on `Task.Run` with a
+  `CancellationTokenSource` that's cancelled when the selection changes; results are marshalled back via
   `Application.Current.Dispatcher` and dropped if the selection has moved on.
+- **Folder stats are two-tier** (`FolderScanService`, issue #40). Windows caches no folder size —
+  the shell property store returns nothing for `System.Size` on a directory — so every number costs
+  an enumeration. `MainViewModel.LoadFolderSizesInBackground` runs both phases after a load:
+  `CountChildren` (direct children, sub-millisecond) for every folder so the details panel has a
+  number immediately, then `Scan` (whole subtree) under a `MaxDegreeOfParallelism = 4`
+  `Parallel.ForEach`, reporting partial totals so the Size cell counts up instead of sitting blank.
+  Completed totals are cached for the session; `Invalidate` drops a path plus its ancestors and
+  descendants, and mutations (`Delete`, `CommitTriage`, `Undo`, `Refresh`) call it.
+  Two traps, both verified rather than assumed:
+    - `AttributesToSkip` filters entries found *during* enumeration, not the root you hand the
+      enumerator. `_allEntries` includes junctions, so the scan pass skips `IsReparsePoint`
+      folders itself; without that, the profile's `My Documents` junction double-counts `Documents`.
+    - `IgnoreInaccessible = true` makes .NET swallow a root it can't open *without* calling
+      `ContinueOnError`, so an unreadable folder reports zero entries and zero errors and renders
+      as "empty". Both option sets leave it off and count errors in the enumerator instead;
+      `FileEntry` shows "no access" for that case and "≥ 4.2 GB" for a partial total.
+- **Navigation** (issue #41) is a two-stack browser model on `MainViewModel`: `NavigateTo` pushes
+  the current folder onto `_backStack` and clears `_forwardStack`; `NavigateBack`/`NavigateForward`
+  move between them via `Step`. `LoadFolder` compares against the outgoing `FolderPath` to tell an
+  actual move from a `Refresh`/`Undo` reload, and only a move restores the remembered selection
+  from `_lastSelectedByFolder`. Enter and double-click enter a folder; files still go to the shell.
+- **Triage marks live in `TriageSession`, not on the folder** (issue #43). They're keyed by full
+  path, so browsing away and back keeps them, and a commit can span folders. Every reload builds
+  new `FileEntry` objects, so `LoadFolder` calls `_triage.Rebind(_allEntries)` to re-apply flags
+  *and* adopt the new instances — skip that and the list shows an unmarked file while the review
+  pile still holds the stale object for the same path. Anything that moves or removes a file has to
+  tell the session: `Delete` calls `Forget`, both rename paths call `Rename`, and `CommitTriage`
+  forgets only the marks it actually acted on (a keeper left in place because no destination was
+  set is still pending). Because marks are now invisible from other folders, the toolbar pill
+  (`HasPendingMarks`/`PendingMarksSummary`) and the commit dialog's per-folder breakdown are load-
+  bearing, not decoration.
 - **Self-update** (`UpdateService`): a background check hits the GitHub releases API and, if a newer
   tag exists, shows an update pill (wired through `MainViewModel`, gated by the `CheckForUpdates`
   setting). `CheckForUpdateAsync` never throws — offline/rate-limited/malformed all read as "no
