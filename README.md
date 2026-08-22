@@ -64,10 +64,10 @@ Requires the [.NET SDK](https://dotnet.microsoft.com/download) 8 or newer.
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip into artifacts/
-./build.ps1 -Version 0.5.0
+./build.ps1 -Version 0.6.0
 
 # Also compile the installer (requires Inno Setup 6: winget install JRSoftware.InnoSetup)
-./build.ps1 -Version 0.5.0 -Installer
+./build.ps1 -Version 0.6.0 -Installer
 ```
 
 ## Releasing
