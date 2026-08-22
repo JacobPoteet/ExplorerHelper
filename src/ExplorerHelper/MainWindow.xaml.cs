@@ -26,6 +26,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                     Preview.Show(_vm.SelectedFile);
                     UpdateRenameBar(_vm.SelectedFile);
                     break;
+                case nameof(MainViewModel.FolderPath):
+                    // Navigation changes the folder without going through MainWindow.LoadFolder.
+                    Title = $"Explorer Helper — {_vm.FolderPath}";
+                    break;
                 case nameof(MainViewModel.TodayDateFormat):
                 case nameof(MainViewModel.CreatedDateFormat):
                     // Live-update the date button labels as the user edits formats in Settings.
@@ -33,6 +37,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                     break;
             }
         };
+
+        // Every folder switch goes through here first: a live MediaElement or WebView2 holds the
+        // outgoing file open, so the preview is torn down before the list is rebuilt (issue #1).
+        _vm.FolderChanging += (_, _) => Preview.Clear();
 
         TriageOverlay.CloseRequested += (_, _) =>
         {
@@ -95,7 +103,23 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                 e.Handled = true;
                 break;
             case Key.Enter:
-                _vm.OpenSelectedCommand.Execute(null);
+                ActivateSelected();
+                e.Handled = true;
+                break;
+            case Key.Back:
+                Navigate(_vm.NavigateUpCommand);
+                e.Handled = true;
+                break;
+            case Key.Left when (Keyboard.Modifiers & ModifierKeys.Alt) != 0:
+                Navigate(_vm.NavigateBackCommand);
+                e.Handled = true;
+                break;
+            case Key.Right when (Keyboard.Modifiers & ModifierKeys.Alt) != 0:
+                Navigate(_vm.NavigateForwardCommand);
+                e.Handled = true;
+                break;
+            case Key.Up when (Keyboard.Modifiers & ModifierKeys.Alt) != 0:
+                Navigate(_vm.NavigateUpCommand);
                 e.Handled = true;
                 break;
             case Key.Z when (Keyboard.Modifiers & ModifierKeys.Control) != 0:
@@ -141,8 +165,67 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
     private void FileList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        ActivateSelected();
+    }
+
+    // --- Navigation (issue #41) ------------------------------------------------------
+
+    /// <summary>
+    /// Enter or double-click: step into a folder, or hand a file to the shell as before. The
+    /// toolbar's Open in Explorer button stays as the way out to a real Explorer window.
+    /// </summary>
+    private void ActivateSelected()
+    {
+        if (_vm.SelectedFile is { IsDirectory: true } folder)
+        {
+            _vm.NavigateTo(folder.FullPath);
+            FocusList();
+            return;
+        }
         _vm.OpenSelectedCommand.Execute(null);
     }
+
+    /// <summary>Runs a navigation command if it's currently allowed, then returns focus to the list.</summary>
+    private void Navigate(System.Windows.Input.ICommand command)
+    {
+        if (!command.CanExecute(null))
+            return;
+        command.Execute(null);
+        FocusList();
+    }
+
+    /// <summary>
+    /// Throws away every pending mark. Marks span folders now, so confirm with the count: the
+    /// user may be discarding decisions made somewhere they can't currently see (issue #43).
+    /// </summary>
+    private void DiscardMarks_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            $"Discard {_vm.PendingMarksSummary}?\n\nNothing on disk changes — only the pending "
+                + "keep/reject decisions are cleared.",
+            "Discard marks",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (answer == MessageBoxResult.Yes)
+            _vm.ClearAllFlags();
+    }
+
+    private void Breadcrumb_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string path })
+        {
+            _vm.NavigateTo(path);
+            FocusList();
+        }
+    }
+
+    /// <summary>
+    /// Puts focus back on the list after a navigation so the keyboard flow continues. Deferred:
+    /// the ListView has to realize the new items before it can take focus onto one.
+    /// </summary>
+    private void FocusList() =>
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => FileList.Focus()));
 
     private void DeleteSelected()
     {

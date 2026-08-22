@@ -145,6 +145,22 @@ public partial class FileEntry : ObservableObject
 
     public string ModifiedDisplay => Modified.ToString("yyyy-MM-dd HH:mm");
 
+    /// <summary>
+    /// The containing folder's name, used to group the triage piles once marks span more than one
+    /// folder (issue #43). Falls back to the full directory path at a drive root, which has none.
+    /// </summary>
+    public string FolderName
+    {
+        get
+        {
+            var directory = Path.GetDirectoryName(FullPath);
+            if (string.IsNullOrEmpty(directory))
+                return string.Empty;
+            var name = Path.GetFileName(directory);
+            return string.IsNullOrEmpty(name) ? directory : name;
+        }
+    }
+
     /// <summary>Type shown in the Type column and used as the file-type filter key label.</summary>
     public string TypeDisplay => IsDirectory ? "Folder" : Extension.Length == 0 ? "—" : Extension;
 
