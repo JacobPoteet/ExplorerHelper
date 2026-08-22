@@ -75,22 +75,24 @@ public static class FolderScanService
     }
 
     /// <summary>
-    /// Counts the direct children of a folder, the "14 items" shown in the Size column. Uses the
-    /// same hidden/system exclusions as <c>MainViewModel.LoadFolder</c> so the count matches the
-    /// list you get after navigating in. Returns null when the folder cannot be read at all.
+    /// Counts the direct children of a folder. Uses the same hidden/system exclusions as
+    /// <c>MainViewModel.LoadFolder</c> so the count matches the list you get after navigating in.
+    /// Returns null when the folder cannot be read, which a caller must not render as "empty".
     /// </summary>
     public static int? CountChildren(string path)
     {
         try
         {
+            using var enumerator = new StatsEnumerator(path, ShallowOptions);
             var count = 0;
-            foreach (var _ in Enumerate(path, ShallowOptions))
+            while (enumerator.MoveNext())
                 count++;
-            return count;
+            // A root that wouldn't open yields nothing at all, which is not the same as a folder
+            // that is genuinely empty.
+            return enumerator.Skipped > 0 && count == 0 ? null : count;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            // A folder that vanished or refuses to open reports nothing rather than a bogus zero.
             return null;
         }
     }
@@ -117,34 +119,63 @@ public static class FolderScanService
         var stopwatch = Stopwatch.StartNew();
         var nextReport = interval;
 
-        using var enumerator = new StatsEnumerator(path, DeepOptions);
-        while (enumerator.MoveNext())
+        // A root that won't open (deleted between the listing and the scan, or permission denied)
+        // reaches ContinueOnError rather than throwing, so it comes back as Skipped instead of
+        // escaping into the Parallel.ForEach the caller runs this in. The try still stands for
+        // everything else the constructor can reject, such as a malformed path.
+        StatsEnumerator enumerator;
+        try
         {
-            if (token.IsCancellationRequested)
-                return stats with { Skipped = enumerator.Skipped };
-
-            var length = enumerator.Current;
-            stats = length < 0 ? stats.AddFolder() : stats.AddFile(length);
-
-            if (progress is not null && stopwatch.Elapsed >= nextReport)
-            {
-                nextReport = stopwatch.Elapsed + interval;
-                progress(stats with { Skipped = enumerator.Skipped });
-            }
+            enumerator = new StatsEnumerator(path, DeepOptions);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new FolderStats(0, 0, 0, 1);
         }
 
-        stats = stats with { Skipped = enumerator.Skipped };
+        using (enumerator)
+        {
+            while (true)
+            {
+                try
+                {
+                    if (!enumerator.MoveNext())
+                        break;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    // Whatever is left is unreachable; report the total so far as a floor.
+                    return stats with { Skipped = enumerator.Skipped + 1 };
+                }
+
+                if (token.IsCancellationRequested)
+                    return stats with { Skipped = enumerator.Skipped };
+
+                var length = enumerator.Current;
+                stats = length < 0 ? stats.AddFolder() : stats.AddFile(length);
+
+                if (progress is not null && stopwatch.Elapsed >= nextReport)
+                {
+                    nextReport = stopwatch.Elapsed + interval;
+                    progress(stats with { Skipped = enumerator.Skipped });
+                }
+            }
+
+            stats = stats with { Skipped = enumerator.Skipped };
+        }
+
         DeepCache[path] = stats;
         return stats;
     }
 
     /// <summary>
     /// Matches the default <c>EnumerateDirectories</c>/<c>EnumerateFiles</c> behaviour the file list
-    /// uses, so a folder's item count agrees with the list you see after entering it.
+    /// uses, so a folder's item count agrees with the list you see after entering it. See
+    /// <see cref="DeepOptions"/> for why IgnoreInaccessible stays off.
     /// </summary>
     private static EnumerationOptions ShallowOptions => new()
     {
-        IgnoreInaccessible = true,
+        IgnoreInaccessible = false,
         AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
     };
 
@@ -154,22 +185,26 @@ public static class FolderScanService
     /// symlink loop never terminates. Seeding a walk from a list of directories you gathered
     /// yourself does not get this protection — <see cref="EnumerationOptions.AttributesToSkip"/>
     /// filters entries found during enumeration, not the root handed to the enumerator.
+    /// <para>
+    /// IgnoreInaccessible is off on purpose. Turning it on makes .NET swallow a root it cannot open
+    /// without ever consulting <see cref="StatsEnumerator.ContinueOnError"/> — verified against
+    /// <c>C:\System Volume Information</c>, which then reports zero entries and zero errors, so an
+    /// unreadable folder renders as an empty one. Off, the same failure arrives as an error the
+    /// enumerator counts and continues past.
+    /// </para>
     /// </summary>
     private static EnumerationOptions DeepOptions => new()
     {
         RecurseSubdirectories = true,
-        IgnoreInaccessible = true,
+        IgnoreInaccessible = false,
         AttributesToSkip = FileAttributes.ReparsePoint,
     };
 
-    /// <summary>Yields the length of each entry, or -1 for a directory.</summary>
-    private static FileSystemEnumerable<long> Enumerate(string path, EnumerationOptions options) =>
-        new(path, static (ref FileSystemEntry entry) => entry.IsDirectory ? -1L : entry.Length, options);
-
     /// <summary>
-    /// The same transform as <see cref="Enumerate"/>, plus a count of what the walk could not read.
-    /// <see cref="EnumerationOptions.IgnoreInaccessible"/> on its own skips those entries silently,
-    /// which would report a short size as if it were the whole answer.
+    /// Yields the length of each entry, or -1 for a directory, and counts what it could not read.
+    /// Returning true from <see cref="ContinueOnError"/> keeps the walk going past an unreadable
+    /// subdirectory while still recording that something was missed, so a short total reports
+    /// itself as a floor instead of passing for the whole answer.
     /// </summary>
     private sealed class StatsEnumerator(string directory, EnumerationOptions options)
         : FileSystemEnumerator<long>(directory, options)

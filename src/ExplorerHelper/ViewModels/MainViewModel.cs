@@ -147,12 +147,34 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    partial void OnSelectedFileChanged(FileEntry? value)
+    partial void OnSelectedFileChanged(FileEntry? oldValue, FileEntry? newValue)
     {
+        // A folder's size and item count land seconds after the selection does, so follow the
+        // selected entry's own notifications to keep the details rows current (issue #40).
+        if (oldValue is not null)
+            oldValue.PropertyChanged -= OnSelectedEntryPropertyChanged;
+        if (newValue is not null)
+            newValue.PropertyChanged += OnSelectedEntryPropertyChanged;
+
         // New selection: drop stale media metadata, show what we know instantly, fetch the rest.
         _currentMedia = null;
         RebuildPreviewDetails();
-        LoadMediaPropertiesInBackground(value);
+        LoadMediaPropertiesInBackground(newValue);
+    }
+
+    /// <summary>
+    /// Refreshes the details rows when the selected folder's scan reports a number. The scan runs
+    /// on a worker, so this hops to the UI thread before touching the bound collection.
+    /// </summary>
+    private void OnSelectedEntryPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(FileEntry.SizeDisplay) or nameof(FileEntry.ItemsDisplay)))
+            return;
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            RebuildPreviewDetails();
+        else
+            dispatcher.BeginInvoke(RebuildPreviewDetails);
     }
 
     private void OnPreviewDetailToggleChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -212,7 +234,8 @@ public partial class MainViewModel : ObservableObject
     private static string? FormatDetail(string key, FileEntry entry, ShellPropertyService.MediaProperties? media) => key switch
     {
         PreviewDetailKinds.Type => entry.TypeDisplay,
-        PreviewDetailKinds.Size => entry.IsDirectory ? null : entry.SizeDisplay,
+        PreviewDetailKinds.Size => entry.SizeDisplay,
+        PreviewDetailKinds.Items => entry.ItemsDisplay,
         PreviewDetailKinds.Dimensions => media?.Dimensions is { } d ? $"{d.Width} × {d.Height}" : null,
         PreviewDetailKinds.Duration => media?.Duration is { } t ? FormatDuration(t) : null,
         PreviewDetailKinds.FrameRate => media?.FrameRate is { } f ? $"{f:0.##} fps" : null,
@@ -358,7 +381,7 @@ public partial class MainViewModel : ObservableObject
 
     private List<FileEntry> _allEntries = [];
     private CancellationTokenSource? _thumbnailCts;
-    private CancellationTokenSource? _childCountCts;
+    private CancellationTokenSource? _folderStatsCts;
 
     partial void OnFilterTextChanged(string value) => ApplyView();
 
@@ -405,7 +428,7 @@ public partial class MainViewModel : ObservableObject
         BuildTypeFilters();
         RecomputeTriage();
         ApplyView();
-        LoadFolderChildCountsInBackground();
+        LoadFolderSizesInBackground();
         LoadThumbnailsInBackground();
     }
 
@@ -941,8 +964,8 @@ public partial class MainViewModel : ObservableObject
         ordered = SortMode switch
         {
             "Size" => SortDescending
-                ? ordered.ThenByDescending(f => f.SizeBytes)
-                : ordered.ThenBy(f => f.SizeBytes),
+                ? ordered.ThenByDescending(f => f.SortSizeBytes)
+                : ordered.ThenBy(f => f.SortSizeBytes),
             "Date" => SortDescending
                 ? ordered.ThenByDescending(f => f.Modified)
                 : ordered.ThenBy(f => f.Modified),
@@ -974,28 +997,61 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Fills in each folder's direct-child count so the Size column reads "14 items" instead of a
-    /// blank (issue #40). One shallow enumeration per folder costs well under a millisecond, so
-    /// this finishes long before the thumbnails do; the recursive size is a per-selection job.
+    /// Measures every folder in the list so the Size column shows what each one actually holds
+    /// (issue #40), in two phases because the two numbers cost wildly different amounts.
+    /// <para>
+    /// Phase 1 counts direct children, well under a millisecond each, so selecting a folder shows
+    /// a number immediately. Phase 2 walks each subtree for its byte total, which runs from
+    /// milliseconds to seconds depending on what's down there; it reports partial totals as it
+    /// goes, so a large folder counts up in place instead of sitting blank.
+    /// </para>
+    /// Reparse points are skipped: a junction's bytes belong to its target, and counting them
+    /// here would report them twice in the same column.
     /// </summary>
-    private void LoadFolderChildCountsInBackground()
+    private void LoadFolderSizesInBackground()
     {
-        _childCountCts?.Cancel();
-        _childCountCts = new CancellationTokenSource();
-        var token = _childCountCts.Token;
-        var folders = _allEntries.Where(e => e.IsDirectory).ToList();
+        _folderStatsCts?.Cancel();
+        _folderStatsCts = new CancellationTokenSource();
+        var token = _folderStatsCts.Token;
+        var folders = _allEntries.Where(e => e.IsDirectory && !e.IsReparsePoint).ToList();
         if (folders.Count == 0)
             return;
 
         Task.Run(() =>
         {
+            // Same cross-thread property set the thumbnail pass uses — WPF marshals the change
+            // notification to the UI thread for a plain (non-collection) property.
             foreach (var entry in folders)
             {
                 if (token.IsCancellationRequested)
                     return;
-                // Same cross-thread property set the thumbnail pass uses — WPF marshals the
-                // change notification to the UI thread for a plain (non-collection) property.
                 entry.ChildCount = FolderScanService.CountChildren(entry.FullPath);
+            }
+
+            try
+            {
+                // Bounded, so one enormous subfolder can't hold up the rest of the column, and so
+                // opening a folder full of folders doesn't put the disk under dozens of walks.
+                Parallel.ForEach(
+                    folders,
+                    new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = token },
+                    entry =>
+                    {
+                        entry.IsScanning = true;
+                        try
+                        {
+                            entry.FolderStats = FolderScanService.Scan(
+                                entry.FullPath, token, partial => entry.FolderStats = partial);
+                        }
+                        finally
+                        {
+                            entry.IsScanning = false;
+                        }
+                    });
+            }
+            catch (OperationCanceledException)
+            {
+                // Navigating away or refreshing mid-scan is routine, not a failure.
             }
         }, token);
     }

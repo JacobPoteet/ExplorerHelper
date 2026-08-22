@@ -67,7 +67,7 @@ Inside `src/ExplorerHelper`:
   `FolderScanService` (folder item counts and subtree sizes).
 - `Models/` — `FileEntry` (the list item), `TriageFlag`, `TypeFilter`, and `PreviewDetail.cs`,
   which holds three types: `PreviewDetailRow`, `PreviewDetailToggle`, and the `PreviewDetailKinds`
-  catalogue (the key list plus `DefaultEnabled`, which turns on 6 of the 8 details).
+  catalogue (the key list plus `DefaultEnabled`, which turns on 7 of the 9 details).
 - `CommitDialog.xaml(.cs)` — the triage commit dialog. Owns the three independent switches
   (recycle rejects / move / copy, issue #23) and the session-remembered destination.
 - `RenameDialog.xaml(.cs)` — the F2 modal, with the Explorer-style stem pre-selection.
@@ -98,12 +98,20 @@ Inside `src/ExplorerHelper`:
   `Application.Current.Dispatcher` and dropped if the selection has moved on.
 - **Folder stats are two-tier** (`FolderScanService`, issue #40). Windows caches no folder size —
   the shell property store returns nothing for `System.Size` on a directory — so every number costs
-  an enumeration. `CountChildren` (direct children, sub-millisecond) runs for every folder row on
-  load; `Scan` (whole subtree, seconds on a large tree) runs only for the selected folder, with
-  cancellation, progress callbacks, and a session cache. Both use `FileSystemEnumerable<long>`
-  reading sizes off `WIN32_FIND_DATA`; a `FileInfo` per entry is 3-5x slower. `AttributesToSkip`
-  filters entries found *during* enumeration, not the root you hand the enumerator, so any fan-out
-  over a directory list must drop reparse points itself or it double-counts junctions.
+  an enumeration. `MainViewModel.LoadFolderSizesInBackground` runs both phases after a load:
+  `CountChildren` (direct children, sub-millisecond) for every folder so the details panel has a
+  number immediately, then `Scan` (whole subtree) under a `MaxDegreeOfParallelism = 4`
+  `Parallel.ForEach`, reporting partial totals so the Size cell counts up instead of sitting blank.
+  Completed totals are cached for the session; `Invalidate` drops a path plus its ancestors and
+  descendants, and mutations (`Delete`, `CommitTriage`, `Undo`, `Refresh`) call it.
+  Two traps, both verified rather than assumed:
+    - `AttributesToSkip` filters entries found *during* enumeration, not the root you hand the
+      enumerator. `_allEntries` includes junctions, so the scan pass skips `IsReparsePoint`
+      folders itself; without that, the profile's `My Documents` junction double-counts `Documents`.
+    - `IgnoreInaccessible = true` makes .NET swallow a root it can't open *without* calling
+      `ContinueOnError`, so an unreadable folder reports zero entries and zero errors and renders
+      as "empty". Both option sets leave it off and count errors in the enumerator instead;
+      `FileEntry` shows "no access" for that case and "≥ 4.2 GB" for a partial total.
 - **Self-update** (`UpdateService`): a background check hits the GitHub releases API and, if a newer
   tag exists, shows an update pill (wired through `MainViewModel`, gated by the `CheckForUpdates`
   setting). `CheckForUpdateAsync` never throws — offline/rate-limited/malformed all read as "no
