@@ -402,7 +402,7 @@
     <section id="triage">
       <div class="wrap">
         <h2>Swipe. Swipe. Done.</h2>
-        <p class="sub">Sort a folder like a dating app — keep the good, reject the junk. Nothing happens to your files until you've reviewed every decision and applied them all with one click.</p>
+        <p class="sub">Sort a folder like a dating app — keep the good, reject the junk. Nothing happens to your files until you've reviewed both piles and applied them with one click. Anything you skip stays untouched.</p>
         <div class="mock tr-mock tr-anim" role="img" aria-label="Animation of triage mode: file cards swipe right to keep and left to reject with stamps, counters tick up, then a review screen applies the changes — the reject flies into the Recycle Bin, and Ctrl+Z can undo everything.">
           <div class="mock-bar">
             <span class="app-ic">🧹</span>
@@ -471,9 +471,9 @@
     <section id="features">
       <div class="wrap">
         <h2>Everything you need to triage a folder</h2>
-        <p class="sub">Previews, filters, and keyboard-first flows — none of it leaves your machine.</p>
+        <p class="sub">Previews, filters, and keyboard-first flows. Your files never leave your machine; the only network call is the update check, which you can switch off in Settings.</p>
         <div class="grid">
-          <div class="card"><div class="ic">🃏</div><h3>Swipe-to-triage</h3><p>The fastest way to clear out a folder: review files one at a time like a dating app — swipe or <kbd>←</kbd>/<kbd>→</kbd> to reject or keep, <kbd>↓</kbd> to skip. Nothing touches the disk until you <strong>Commit</strong>: a review screen shows both piles so you can swap or unmark any file, then rejects go to the Recycle Bin and keepers can move to a folder of your choice — one <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the whole commit.</p></div>
+          <div class="card"><div class="ic">🃏</div><h3>Swipe-to-triage</h3><p>The fastest way to clear out a folder: review files one at a time like a dating app — swipe or <kbd>←</kbd>/<kbd>→</kbd> to reject or keep, <kbd>↓</kbd> to skip. Nothing touches the disk until you <strong>Commit</strong>: a review screen shows both piles so you can swap or unmark any file, then you choose what happens — send rejects to the Recycle Bin or leave them alone, and move <em>or</em> copy the keepers to a folder of your choice. One <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the whole commit.</p></div>
           <div class="card"><div class="ic">🖱️</div><h3>Explorer context menu</h3><p>“Clean this folder” on folders and folder backgrounds. Per-user, no admin required.</p></div>
           <div class="card"><div class="ic">👁️</div><h3>Live previews</h3><p>Images render natively, video and audio play inline, and PDFs open in the built-in viewer.</p></div>
           <div class="card"><div class="ic">⏱️</div><h3>Scrub timeline</h3><p>Video previews come with play/pause, elapsed and total time, and a draggable slider to jump anywhere in the clip.</p></div>
@@ -484,7 +484,7 @@
           <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p>Renamed, deleted, or committed the wrong thing? <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back — files come straight out of the Recycle Bin.</p></div>
           <div class="card"><div class="ic">🔠</div><h3>Filter &amp; sort</h3><p>Filter by name and toggle file types on or off. Sort by name, size, date, or type — folders always first.</p></div>
           <div class="card"><div class="ic">🗑️</div><h3>Safe by default</h3><p>Deletes go to the Recycle Bin, never a permanent wipe. Multi-select to clear several at once.</p></div>
-          <div class="card"><div class="ic">🔄</div><h3>Always up to date</h3><p>When a new release ships, an update button appears in the toolbar — one click downloads it, installs silently, and restarts the app right where you were. Toggleable in Settings.</p></div>
+          <div class="card"><div class="ic">🔄</div><h3>Always up to date</h3><p>When a new release ships, an update button appears in the toolbar — on an installed copy, one click downloads it, installs silently, and restarts the app right where you were. The portable build opens the release page instead. Toggleable in Settings.</p></div>
         </div>
       </div>
     </section>
@@ -499,7 +499,7 @@
         <div class="steps">
           <div class="step"><h3>Right-click a folder</h3><p>Pick <strong>Clean this folder</strong> from the Explorer context menu (or the background of an open folder).</p></div>
           <div class="step"><h3>Swipe through it</h3><p>Preview each file and flag it keep or reject — swipe, <kbd>←</kbd>/<kbd>→</kbd>, or <kbd>K</kbd>/<kbd>X</kbd>. Rename a run of clips with <kbd>Enter</kbd> along the way.</p></div>
-          <div class="step"><h3>Commit once</h3><p>Review both piles, then <strong>Commit</strong>: rejects go to the Recycle Bin and keepers can move to a folder you choose.</p></div>
+          <div class="step"><h3>Commit once</h3><p>Review both piles, then <strong>Commit</strong>: send rejects to the Recycle Bin (or leave them), and move or copy the keepers to a folder you choose.</p></div>
           <div class="step"><h3>Undo mistakes</h3><p>Changed your mind? <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the last rename, delete, or the whole commit — no digging required.</p></div>
         </div>
       </div>
@@ -517,7 +517,7 @@
             <h3>⬇ Installer (recommended)</h3>
             <p class="muted">Download <code>ExplorerHelper-Setup-*.exe</code> from the latest release and run it. It installs per-user (no admin prompt) and registers the context-menu entries. Uninstalling removes them again — and from here the app keeps itself up to date with one-click updates.</p>
             <p><a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Download latest release</a></p>
-            <p class="muted" style="font-size:.85rem">A portable zip is published with every release too — use the <strong>Add context menu</strong> button inside the app.</p>
+            <p class="muted" style="font-size:.85rem">A portable zip is published with every release too — use the <strong>Add context menu</strong> button inside the app. The portable build points you at the release page for updates rather than installing them itself.</p>
           </div>
           <div class="install-card">
             <h3>🛠 Build from source</h3>
@@ -526,7 +526,7 @@
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip
-./build.ps1 -Version 0.4.0</code></pre>
+./build.ps1 -Version 0.5.0</code></pre>
           </div>
         </div>
         <div class="callout">
