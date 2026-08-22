@@ -84,9 +84,10 @@ git push origin v0.6.0
 The release workflow derives the version from the tag, builds the zip and installer with it, and
 attaches both to a GitHub Release with generated notes.
 
-> The tag is what the shipped binaries carry, so a forgotten csproj bump doesn't break a release.
-> It does mean local builds report the stale number and see a permanent "update available" pill,
-> which is why the two should move together.
+> The workflow stops if `<Version>` and the tag disagree. Shipped binaries carry the tag either
+> way, so the mismatch is harmless for users — but a stale csproj makes every build from source
+> report the old number, see the newer tag on GitHub, and show a permanent "update available"
+> pill. The two move together.
 
 ## Tech notes
 

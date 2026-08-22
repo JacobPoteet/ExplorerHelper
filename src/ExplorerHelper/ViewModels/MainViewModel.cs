@@ -453,13 +453,16 @@ public partial class MainViewModel : ObservableObject
         var restorable = new List<(string Original, string Recycled)>();
         foreach (var entry in entries)
         {
-            var recycled = RecycleBinService.MoveToRecycleBin(entry.FullPath);
-            if (recycled is not null)
-            {
+            var result = RecycleBinService.MoveToRecycleBin(entry.FullPath);
+            if (!result.Deleted)
+                continue; // still on disk — leave the row alone
+
+            // Gone from the folder, so the row goes too. The bin path is what undo needs, and the
+            // shell doesn't always report it; without one the file is simply not undoable (issue #32).
+            if (result.RecycledPath is { } recycled)
                 restorable.Add((entry.FullPath, recycled));
-                Files.Remove(entry);
-                _allEntries.Remove(entry);
-            }
+            Files.Remove(entry);
+            _allEntries.Remove(entry);
         }
 
         if (restorable.Count > 0)
@@ -544,15 +547,24 @@ public partial class MainViewModel : ObservableObject
         var failures = 0;
 
         var recycled = new List<(string Original, string Recycled)>();
+        var rejectsDeleted = 0; // includes files the shell deleted without reporting a bin path
         if (deleteRejects)
         {
             foreach (var entry in rejects)
             {
-                var binPath = RecycleBinService.MoveToRecycleBin(entry.FullPath);
-                if (binPath is not null)
-                    recycled.Add((entry.FullPath, binPath));
-                else
+                // MoveToRecycleBin never throws, so one unreachable file is a counted failure
+                // rather than an abort that would skip PushUndo and strand everything already
+                // recycled in this loop with no way back (issue #32).
+                var result = RecycleBinService.MoveToRecycleBin(entry.FullPath);
+                if (!result.Deleted)
+                {
                     failures++;
+                    continue;
+                }
+
+                rejectsDeleted++;
+                if (result.RecycledPath is { } binPath)
+                    recycled.Add((entry.FullPath, binPath));
             }
         }
 
@@ -560,12 +572,22 @@ public partial class MainViewModel : ObservableObject
         var copied = new List<string>();
         if (!string.IsNullOrWhiteSpace(keepDestination))
         {
+            // One directory read up front instead of two existence checks per collision per file —
+            // moving hundreds of same-stem keepers was quadratic in syscalls, all on the UI thread
+            // with the triage overlay still up (issue #35).
+            var takenNames = Directory.Exists(keepDestination)
+                ? new HashSet<string>(
+                    new DirectoryInfo(keepDestination).EnumerateFileSystemInfos().Select(i => i.Name),
+                    StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var entry in keeps)
             {
                 var stem = Path.GetFileNameWithoutExtension(entry.FullPath);
                 var ext = Path.GetExtension(entry.FullPath);
                 var target = Path.Combine(
-                    keepDestination, NextAvailableName(keepDestination, stem, ext, entry.FullPath));
+                    keepDestination,
+                    NextAvailableName(keepDestination, stem, ext, entry.FullPath, takenNames));
                 if (string.Equals(target, entry.FullPath, StringComparison.OrdinalIgnoreCase))
                     continue; // destination is the folder it's already in
                 try
@@ -604,7 +626,7 @@ public partial class MainViewModel : ObservableObject
         LoadFolder(FolderPath);
 
         var summaryParts = new List<string>();
-        summaryParts.Add(deleteRejects ? $"{recycled.Count} recycled" : $"{rejects.Count} rejected files left in place");
+        summaryParts.Add(deleteRejects ? $"{rejectsDeleted} recycled" : $"{rejects.Count} rejected files left in place");
         if (moved.Count > 0) summaryParts.Add($"{moved.Count} moved");
         if (copied.Count > 0) summaryParts.Add($"{copied.Count} copied");
         if (moved.Count == 0 && copied.Count == 0) summaryParts.Add($"{keeps.Count} kept in place");
@@ -724,8 +746,17 @@ public partial class MainViewModel : ObservableObject
             return ex.Message;
         }
 
+        // Point the entry at its new path before reloading. Refresh() carries triage flags across
+        // by path, so a stale FullPath here would key the snapshot on the old name and silently
+        // drop the file's keep/reject flag (issue #30).
+        entry.UpdatePath(newPath);
         PushUndo($"rename to “{newName}”", () => ReverseRename(newPath, oldPath, wasDir));
         Refresh();
+
+        // Refresh() replaces every FileEntry, so re-select the renamed file under its new path —
+        // otherwise F2 drops the selection (and the preview) on the file just renamed.
+        SelectedFile = Files.FirstOrDefault(
+            e => string.Equals(e.FullPath, newPath, StringComparison.OrdinalIgnoreCase));
         return null;
     }
 
@@ -785,19 +816,48 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// First free name of the form "stem.ext", then "stem 2.ext", "stem 3.ext", … The entry's
     /// own current path counts as free, so re-applying the same name is a no-op rather than a bump.
+    /// Probes the filesystem, so it costs one existence check per collision — fine for a single
+    /// rename, which is why the commit loop uses the overload that takes a set of taken names.
     /// </summary>
     private static string NextAvailableName(string directory, string stem, string extension, string currentPath)
+        => NextAvailableName(directory, stem, extension, currentPath,
+            candidatePath => !File.Exists(candidatePath) && !Directory.Exists(candidatePath));
+
+    /// <summary>
+    /// Same numbering, but probing an in-memory set of names already in the destination instead of
+    /// the disk. Keeps the triage commit at one directory read rather than two syscalls per
+    /// collision per file (issue #35). Names handed out are added to <paramref name="taken"/> so
+    /// two keepers with the same stem don't both claim it.
+    /// </summary>
+    private static string NextAvailableName(
+        string directory, string stem, string extension, string currentPath, HashSet<string> taken)
     {
-        for (var n = 1; ; n++)
+        var name = NextAvailableName(directory, stem, extension, currentPath,
+            candidatePath => !taken.Contains(Path.GetFileName(candidatePath)));
+        taken.Add(name);
+        return name;
+    }
+
+    /// <summary>
+    /// Shared numbering loop. Capped so a pathological folder degrades to a unique suffixed name
+    /// instead of spinning on the UI thread with no exit (issue #35) — 10,000 same-stem files is
+    /// already far past anything a rename bar is for.
+    /// </summary>
+    private static string NextAvailableName(
+        string directory, string stem, string extension, string currentPath, Func<string, bool> isFree)
+    {
+        const int maxAttempts = 10_000;
+        for (var n = 1; n <= maxAttempts; n++)
         {
             var candidate = (n == 1 ? stem : $"{stem} {n}") + extension;
             var candidatePath = Path.Combine(directory, candidate);
 
             if (string.Equals(candidatePath, currentPath, StringComparison.OrdinalIgnoreCase))
                 return candidate;
-            if (!File.Exists(candidatePath) && !Directory.Exists(candidatePath))
+            if (isFree(candidatePath))
                 return candidate;
         }
+        return $"{stem}_{Guid.NewGuid().ToString("n")[..8]}{extension}";
     }
 
     private void RememberName(string stem)

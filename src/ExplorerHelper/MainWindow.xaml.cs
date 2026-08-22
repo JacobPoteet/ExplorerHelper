@@ -367,9 +367,20 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         if (dialog.ShowDialog() != true)
             return;
 
-        var error = _vm.Rename(entry, dialog.NewName);
-        if (error is not null)
-            MessageBox.Show(this, error, "Rename failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        // Same handle discipline as delete and quick-rename: the modal doesn't stop the preview,
+        // so a playing video still holds the file open and File.Move would fail. Clear the preview
+        // and defer one Background pump so the media engine's teardown frees the handle first
+        // (issue #31).
+        Preview.Clear();
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            var error = _vm.Rename(entry, dialog.NewName);
+            if (error is not null)
+                MessageBox.Show(this, error, "Rename failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            Preview.Show(_vm.SelectedFile); // restore the preview we cleared
+        }));
     }
 
 }

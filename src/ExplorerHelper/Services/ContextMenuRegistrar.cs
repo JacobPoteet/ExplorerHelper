@@ -13,8 +13,21 @@ public static class ContextMenuRegistrar
     private const string FolderKey = @"Software\Classes\Directory\shell\ExplorerHelper";
     private const string BackgroundKey = @"Software\Classes\Directory\Background\shell\ExplorerHelper";
 
-    public static bool IsRegistered =>
-        Registry.CurrentUser.OpenSubKey(FolderKey) is not null;
+    /// <summary>
+    /// True only when both keys are present. Checking one would let a half-present registration
+    /// (partial uninstall, registry cleaner, interrupted <see cref="Unregister"/>) read as
+    /// installed, so the Settings button would offer Remove instead of the Add that repairs it
+    /// (issue #34).
+    /// </summary>
+    public static bool IsRegistered
+    {
+        get
+        {
+            using var folder = Registry.CurrentUser.OpenSubKey(FolderKey);
+            using var background = Registry.CurrentUser.OpenSubKey(BackgroundKey);
+            return folder is not null && background is not null;
+        }
+    }
 
     public static void Register(string exePath)
     {

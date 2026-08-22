@@ -15,17 +15,32 @@ namespace ExplorerHelper.Services;
 public static class RecycleBinService
 {
     /// <summary>
-    /// Sends a single path to the Recycle Bin. Returns the item's new location inside the
-    /// Recycle Bin (the <c>$R…</c> file) for later restore, or null if the delete failed.
+    /// Outcome of a recycle. <c>Deleted</c> says whether the file left the folder;
+    /// <c>RecycledPath</c> is its <c>$R…</c> location inside the bin, which the shell
+    /// does not always report. The two are separate because "gone but not restorable" is a real
+    /// state: the row must drop out of the list even when no undo can be offered (issue #32).
     /// </summary>
-    public static string? MoveToRecycleBin(string path)
+    public readonly record struct RecycleResult(bool Deleted, string? RecycledPath)
     {
-        var op = (IFileOperation)Activator.CreateInstance(
-            Type.GetTypeFromCLSID(CLSID_FileOperation)!)!;
+        public static readonly RecycleResult Failed = new(false, null);
+    }
+
+    /// <summary>
+    /// Sends a single path to the Recycle Bin. Never throws — a path that vanished between
+    /// enumeration and delete (removed in Explorer, SD card pulled, share dropped) comes back as
+    /// <see cref="RecycleResult.Failed"/> so callers can count it instead of unwinding a batch.
+    /// </summary>
+    public static RecycleResult MoveToRecycleBin(string path)
+    {
+        IFileOperation? op = null;
         try
         {
+            op = (IFileOperation)Activator.CreateInstance(
+                Type.GetTypeFromCLSID(CLSID_FileOperation)!)!;
             op.SetOperationFlags(FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI);
 
+            // SHCreateItemFromParsingName is PreserveSig = false, so a missing path arrives as a
+            // COMException rather than a failure HRESULT.
             var iid = typeof(IShellItem).GUID;
             SHCreateItemFromParsingName(path, IntPtr.Zero, ref iid, out var item);
 
@@ -33,13 +48,18 @@ public static class RecycleBinService
             op.DeleteItem(item, sink);
             op.PerformOperations();
 
-            if (op.GetAnyOperationsAborted())
-                return null;
-            return sink.RecycledPath;
+            if (op.GetAnyOperationsAborted() || !sink.Deleted)
+                return RecycleResult.Failed;
+            return new RecycleResult(true, sink.RecycledPath);
+        }
+        catch
+        {
+            return RecycleResult.Failed;
         }
         finally
         {
-            Marshal.FinalReleaseComObject(op);
+            if (op is not null)
+                Marshal.FinalReleaseComObject(op);
         }
     }
 
@@ -95,13 +115,22 @@ public static class RecycleBinService
     private static readonly Guid CLSID_FileOperation = new("3ad05575-8857-4850-9277-11b85bdb8e09");
     private const uint SIGDN_FILESYSPATH = 0x80058000;
 
-    /// <summary>Captures the destination path of each recycled item via <c>PostDeleteItem</c>.</summary>
+    /// <summary>
+    /// Records the outcome of each item via <c>PostDeleteItem</c>: whether the delete succeeded,
+    /// and where it landed. The shell reports <c>psiNewlyCreated</c> as null in some cases (a
+    /// bypassed bin, a volume with no bin), so a successful delete can still yield no path.
+    /// </summary>
     private sealed class RecycleSink : IFileOperationProgressSink
     {
         public string? RecycledPath { get; private set; }
+        public bool Deleted { get; private set; }
 
         public int PostDeleteItem(uint dwFlags, IShellItem psiItem, int hrDelete, IShellItem? psiNewlyCreated)
         {
+            if (hrDelete < 0)
+                return 0; // failed HRESULT — leave Deleted false
+
+            Deleted = true;
             if (psiNewlyCreated is not null)
             {
                 psiNewlyCreated.GetDisplayName(SIGDN_FILESYSPATH, out var path);
