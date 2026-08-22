@@ -26,15 +26,16 @@ jobs:
         run: '"version=$($env:GITHUB_REF_NAME -replace ''^v'','''')" | Out-File -FilePath $env:GITHUB_OUTPUT -Append'
 
       # UpdateService compares the running assembly version against the newest release tag, so a
-      # csproj that lags the tag ships a binary that reports an update to itself (issue #33).
-      - name: Check csproj version matches the tag
+      # declared version that lags the tag ships a binary that reports an update to itself
+      # (issue #33). ./release.ps1 bumps and tags together so this should never fire (issue #46).
+      - name: Check declared version matches the tag
         shell: pwsh
         run: |
-          $declared = ([xml](Get-Content src/ExplorerHelper/ExplorerHelper.csproj)).Project.PropertyGroup.Version |
+          $declared = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version |
             Where-Object { $_ } | Select-Object -First 1
           $tag = '${{ steps.version.outputs.version }}'
           if ($declared -ne $tag) {
-            throw "ExplorerHelper.csproj <Version> is '$declared' but the tag says '$tag'. Bump the csproj and build.ps1's -Version default, then re-tag."
+            throw "Directory.Build.props <Version> is '$declared' but the tag says '$tag'. Cut releases with ./release.ps1 -Version $tag, which bumps and tags together."
           }
 
       - name: Build zip + installer

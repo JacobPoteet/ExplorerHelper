@@ -14,7 +14,8 @@
 
     <AssemblyTitle>Explorer Helper Shell Extension</AssemblyTitle>
     <Description>Windows 11 top-level context menu handler for Explorer Helper.</Description>
-    <Version>0.1.0</Version>
+    <!-- Version comes from Directory.Build.props. It sat at 0.1.0 while the app reached 0.6.0
+         precisely because it was a separate number nobody remembered to bump (issue #46). -->
   </PropertyGroup>
 
 </Project>

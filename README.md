@@ -72,22 +72,30 @@ dotnet run --project src/ExplorerHelper
 
 ## Releasing
 
-CI builds every push and PR (`.github/workflows/ci.yml`). To cut a release, bump `<Version>` in
-`src/ExplorerHelper/ExplorerHelper.csproj` and the `-Version` default in `build.ps1` to match, then
-tag:
+From an up-to-date `main` with a clean tree:
 
 ```powershell
-git tag v0.6.0
-git push origin v0.6.0
+./release.ps1 -Version 0.7.0
 ```
 
-The release workflow derives the version from the tag, builds the zip and installer with it, and
-attaches both to a GitHub Release with generated notes.
+That bumps `Directory.Build.props`, commits, tags `v0.7.0`, and pushes the commit and tag. The
+release workflow then builds the zip and installer and attaches them to a GitHub Release with
+generated notes. Watch it with `gh run watch`.
 
-> The workflow stops if `<Version>` and the tag disagree. Shipped binaries carry the tag either
-> way, so the mismatch is harmless for users — but a stale csproj makes every build from source
-> report the old number, see the newer tag on GitHub, and show a permanent "update available"
-> pill. The two move together.
+Add `-WhatIf` to see the plan without touching anything, or `-Branch <name>` to cut from somewhere
+other than `main`. The script refuses to run on the wrong branch, with uncommitted changes, out of
+sync with origin, or onto a tag that already exists — all checked before it writes anything.
+
+**The version lives in `Directory.Build.props` and nowhere else.** Both projects inherit it and
+`build.ps1` defaults to it. Don't edit it by hand: `release.yml` refuses to build a tag that
+disagrees with it, and tagging a commit that predates the bump is how v0.6.0 failed (issue #46).
+
+If a release does fail the version check, the tag is pointing at the wrong commit. Land the bump,
+then move it:
+
+```powershell
+git checkout main; git pull; git tag -f v0.7.0; git push origin -f v0.7.0
+```
 
 ## Tech notes
 
