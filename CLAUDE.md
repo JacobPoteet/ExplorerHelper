@@ -20,9 +20,6 @@ in `App.xaml.cs` via `ApplicationAccentColorManager`, so changing brand colors m
 
 ```powershell
 # Build both projects (dotnet 9 SDK on CI, but the target is net8.0-windows)
-# CI does NOT do this. It only runs build.ps1, which publishes the app csproj alone, so
-# ExplorerHelper.ShellExtension is never compiled by CI (issue #37). Build the .sln locally
-# before touching that project.
 dotnet build ExplorerHelper.sln -c Debug
 
 # Run — the first existing directory in args is the folder to open; with none, a folder picker shows
@@ -31,8 +28,9 @@ dotnet run --project src/ExplorerHelper -- "C:\some\folder"
 src/ExplorerHelper/bin/Debug/net8.0-windows/ExplorerHelper.exe "C:\some\folder"
 
 # Publish self-contained exe + portable zip into artifacts/ (also the CI smoke test)
-# build.ps1's -Version default and csproj <Version> both say 0.4.0; the newest tag is v0.5.0
-# (issue #33). Pass -Version explicitly until that's reconciled.
+# build.ps1's -Version default and the csproj <Version> both track the newest tag (0.5.0).
+# Bump both when cutting a release — release.yml fails the build if they disagree with the tag,
+# because a lagging version makes every local build think an update is waiting (issue #33).
 ./build.ps1 -Version 0.5.0
 ./build.ps1 -Version 0.5.0 -Installer   # also builds Inno Setup installer
 ```
@@ -152,7 +150,9 @@ Notes:
 ## CI
 
 `.github/workflows/ci.yml` runs `build.ps1 -Version 0.0.0-ci` on `windows-latest` and uploads the
-zip. That publish is the *only* compile step, and it targets `src/ExplorerHelper/ExplorerHelper.csproj`
-by path, so **CI does not build `ExplorerHelper.ShellExtension`** (issue #37). A break there reaches
-`main` unnoticed. `release.yml` fires on `v*` tags, derives the version from the tag, and adds the
-Inno installer. `pages.yml` deploys `docs/` on changes under that path.
+zip. That publish targets `src/ExplorerHelper/ExplorerHelper.csproj` by path and there's no
+`ProjectReference` between the projects, so a second step builds
+`ExplorerHelper.ShellExtension` explicitly — without it a break in the extension's hand-declared
+COM vtables reaches `main` unnoticed (issue #37). `release.yml` fires on `v*` tags, checks the
+csproj `<Version>` against the tag, derives the version from the tag, and adds the Inno installer.
+`pages.yml` deploys `docs/` on changes under that path.

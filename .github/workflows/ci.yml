@@ -15,10 +15,16 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      # build.ps1 publishes Release, which compiles everything a plain build would —
-      # one restore + compile instead of two.
+      # build.ps1 publishes the app csproj by path, so this covers the app only.
       - name: Build & publish (smoke test the packaging path)
         run: ./build.ps1 -Version 0.0.0-ci
+
+      # The shell extension is a separate project with no ProjectReference from the app, so the
+      # publish above never touches it. Without this step a compile break there — most likely in
+      # the hand-declared IExplorerCommand vtables — reaches main unnoticed and only surfaces the
+      # next time someone runs packaging/Build-SparsePackage.ps1 (issue #37).
+      - name: Build shell extension
+        run: dotnet build src/ExplorerHelper.ShellExtension/ExplorerHelper.ShellExtension.csproj -c Release --nologo
 
       - uses: actions/upload-artifact@v7
         with:
