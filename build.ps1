@@ -2,17 +2,28 @@
 .SYNOPSIS
     Builds Explorer Helper. Same script used locally and by GitHub Actions.
 .EXAMPLE
-    ./build.ps1                          # publish self-contained exe + zip
-    ./build.ps1 -Version 1.2.3 -Installer  # also compile the Inno Setup installer
+    ./build.ps1                            # version from Directory.Build.props; exe + zip
+    ./build.ps1 -Version 1.2.3 -Installer  # override, and compile the Inno Setup installer
 #>
 param(
     [string]$Configuration = 'Release',
-    [string]$Version = '0.6.0',
+    [string]$Version,
     [switch]$Installer
 )
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+
+# Default to whatever Directory.Build.props says, so there's no second number to keep in step.
+# CI passes -Version from the tag; release.yml has already checked the two agree.
+if (-not $Version) {
+    $props = Get-Content (Join-Path $root 'Directory.Build.props') -Raw
+    if ($props -notmatch '<Version>(.*?)</Version>') {
+        Write-Error 'No <Version> in Directory.Build.props, and no -Version given.'
+    }
+    $Version = $Matches[1]
+    Write-Host "Version $Version (from Directory.Build.props)"
+}
 $publishDir = Join-Path $root 'artifacts\publish'
 
 dotnet publish (Join-Path $root 'src\ExplorerHelper\ExplorerHelper.csproj') `

@@ -27,12 +27,13 @@ dotnet run --project src/ExplorerHelper -- "C:\some\folder"
 # or run the built exe directly:
 src/ExplorerHelper/bin/Debug/net8.0-windows/ExplorerHelper.exe "C:\some\folder"
 
-# Publish self-contained exe + portable zip into artifacts/ (also the CI smoke test)
-# build.ps1's -Version default and the csproj <Version> both track the newest tag (0.6.0).
-# Bump both when cutting a release — release.yml fails the build if they disagree with the tag,
-# because a lagging version makes every local build think an update is waiting (issue #33).
-./build.ps1 -Version 0.6.0
-./build.ps1 -Version 0.6.0 -Installer   # also builds Inno Setup installer
+# Publish self-contained exe + portable zip into artifacts/ (also the CI smoke test).
+# Version comes from Directory.Build.props; -Version only overrides it.
+./build.ps1
+./build.ps1 -Installer                  # also builds Inno Setup installer
+
+# Cut a release: bumps the props file, commits, tags, and pushes both (issue #46).
+./release.ps1 -Version 0.7.0
 ```
 
 There is **no test project**. Verify changes by driving the running app (see below).
@@ -89,6 +90,14 @@ Inside `src/ExplorerHelper`:
   see in a stack trace. Navigation is covered centrally: `MainViewModel.FolderChanging` fires
   before every folder switch and `MainWindow` clears the preview on it, so command-bound toolbar
   buttons and code-behind paths both release handles without each remembering to.
+- **The version lives in `Directory.Build.props` only** (issue #46). Both projects inherit it and
+  `build.ps1` defaults to it, so there is no second number to keep in step — the shell extension sat
+  at 0.1.0 for five releases because it had one. `release.yml` fails a tag that disagrees with the
+  props file, since a lagging version makes a build from source see the newer tag and show a
+  permanent "update available" pill (issue #33). Bump it with `./release.ps1 -Version x.y.z`, which
+  bumps, commits, tags and pushes together so the two can't drift apart. Note the declared version
+  never reaches a *released* binary: `build.ps1` passes `-p:Version` from the tag, which overrides
+  it. It only affects local builds.
 - **Settings persistence:** user prefs live in `AppSettings` → `%APPDATA%\ExplorerHelper\settings.json`.
   It's forgiving of missing/corrupt files (falls back to defaults) and `Normalized()` fills in
   nulls from older files. New persisted settings: add a property, default it, and normalize it.

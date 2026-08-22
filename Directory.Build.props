@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    The single source of truth for the product version. MSBuild imports this into every project
+    under the repo root, so the app and the shell extension stay in step without either csproj
+    naming a number of its own.
+
+    Everything else derives from it: build.ps1 defaults -Version to this, passes it to
+    dotnet publish, hands it to Inno Setup as /DAppVersion, and names the zip after it.
+    release.ps1 rewrites the line below, commits, and tags in one step; release.yml checks the
+    result against the tag before it builds.
+
+    Bump it with `./release.ps1 -Version x.y.z` rather than by hand (issue #46).
+  -->
+  <PropertyGroup>
+    <Version>0.6.0</Version>
+  </PropertyGroup>
+
+</Project>
