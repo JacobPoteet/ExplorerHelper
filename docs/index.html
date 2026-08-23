@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Explorer Helper — clean and organize folders from the right-click menu</title>
-  <meta name="description" content="Clean and organize any Windows folder straight from the Explorer right-click menu. Live previews, swipe-to-triage, quick rename with reusable buttons, and one-key undo." />
+  <title>Explorer Helper: clean and organize folders from the right-click menu</title>
+  <meta name="description" content="Clean and organize any Windows folder straight from the Explorer right-click menu. Live previews, swipe-to-triage, folder sizes, quick rename with reusable buttons, and one-key undo." />
   <meta property="og:title" content="Explorer Helper" />
-  <meta property="og:description" content="Clean and organize any Windows folder straight from the Explorer right-click menu — swipe to triage, rename fast, undo anything." />
+  <meta property="og:description" content="Clean and organize any Windows folder straight from the Explorer right-click menu. Swipe to triage, rename fast, undo anything." />
   <meta property="og:type" content="website" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧹</text></svg>" />
   <style>
@@ -100,6 +100,14 @@
     .pill.search { color: var(--muted); min-width: 190px; }
     .pill.primary { background: linear-gradient(180deg, #8d6dff, #6b46f0); border-color: transparent; color: #fff; font-weight: 600; }
     .pill.update { background: rgba(124,92,252,.20); border-color: rgba(124,92,252,.55); color: #d9ccff; border-radius: 999px; }
+    .pill.marks { background: rgba(61,214,140,.16); border-color: rgba(61,214,140,.5); color: #bdf0d5; border-radius: 999px; }
+    /* Location bar: back/forward/up plus the clickable breadcrumb */
+    .mock-crumbs { display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: .82rem; flex-wrap: wrap; }
+    .mock-crumbs .navbtn { min-width: 26px; height: 24px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--text); font-size: .78rem; }
+    .mock-crumbs .navbtn.dim { color: var(--muted); opacity: .45; }
+    .mock-crumbs .crumb { color: var(--text); }
+    .mock-crumbs .crumb.cur { color: var(--accent); font-weight: 600; }
+    .mock-crumbs .sep { color: var(--muted); }
     .toolbar-spacer { flex: 1; }
     .mock-body { display: grid; grid-template-columns: 1.6fr 1fr; min-height: 320px; }
     .filelist { border-right: 1px solid var(--border); }
@@ -139,9 +147,9 @@
 
     /* ---- Triage demo animation --------------------------------------------------
        A 12s pure-CSS loop: three cards swipe (right = keep, left = reject) with
-       stamps and live counters, then a review panel commits — the reject flies
+       stamps and live counters, then a review panel commits: the reject flies
        into the Recycle Bin. Every element's resting style matches its 0% frame,
-       so prefers-reduced-motion simply shows the idle deck. */
+       so prefers-reduced-motion shows the idle deck instead. */
     .tr-mock { max-width: 660px; margin: 0 auto; }
     .tr-stage { position: relative; height: 360px; background: var(--bg-2); overflow: hidden; }
     .tr-top { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px; }
@@ -150,7 +158,7 @@
     .tr-pill.kep { background: rgba(61,214,140,.14); border-color: rgba(61,214,140,.4); color: var(--ok); }
     .tr-remaining { color: var(--muted); font-size: .8rem; }
     /* Digits stack in the same grid cell so they overlay each other while
-       staying in normal flow — keeps them on the text baseline next to the icons. */
+       staying in normal flow, keeps them on the text baseline next to the icons. */
     .tr-count { display: inline-grid; min-width: .72em; text-align: center; }
     .tr-count span { grid-area: 1 / 1; opacity: 0; animation: 12s ease-in-out infinite; }
     .tr-count .v0 { opacity: 1; }
@@ -322,8 +330,8 @@
       <h1>Clean up any folder<br /><span class="grad">without leaving Explorer.</span></h1>
       <p class="lead">
         Right-click a folder, hit <strong>Clean this folder</strong>, then swipe through its contents
-        with live previews and keyboard shortcuts — keep, reject, rename, and commit in one pass.
-        Built for taming folders of clips, screenshots, and downloads.
+        with live previews and keyboard shortcuts: keep, reject, rename, and commit in one pass.
+        Browse into subfolders without leaving the app, and your keep/reject marks travel with you.
       </p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">⬇ Download for Windows</a>
@@ -335,10 +343,10 @@
         <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" />
         <img alt="Windows 10 / 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-7C5CFC" />
       </div>
-      <p class="note">Per-user install — no admin prompt. <kbd>Del</kbd> sends to the Recycle Bin, never permanent deletion.</p>
+      <p class="note">Per-user install, no admin prompt. <kbd>Del</kbd> sends to the Recycle Bin, never permanent deletion.</p>
 
       <!-- App mock -->
-      <div class="mock" role="img" aria-label="Screenshot of the Explorer Helper window: a sortable file list on the left and a preview pane on the right.">
+      <div class="mock" role="img" aria-label="Screenshot of the Explorer Helper window: a breadcrumb location bar, a sortable file list with folder sizes on the left, and a preview pane on the right.">
         <div class="mock-bar">
           <span class="app-ic">🧹</span>
           <span class="title">Explorer Helper — C:\Users\you\Videos\Clips</span>
@@ -348,16 +356,28 @@
           <span class="pill search">🔎 Filter files by name…</span>
           <span class="pill">Types ▾</span>
           <span class="toolbar-spacer"></span>
-          <span class="pill update">⬇ v0.5.0 available</span>
+          <span class="pill marks">5 marks in 2 folders ✕</span>
+          <span class="pill update">⬇ v0.6.0 available</span>
           <span class="pill primary">🃏 Triage</span>
           <span class="pill">↻</span>
           <span class="pill">↩</span>
           <span class="pill">⚙</span>
         </div>
+        <div class="mock-crumbs">
+          <span class="navbtn">←</span>
+          <span class="navbtn dim">→</span>
+          <span class="navbtn">↑</span>
+          <span class="crumb">C:\</span><span class="sep">›</span>
+          <span class="crumb">Users</span><span class="sep">›</span>
+          <span class="crumb">you</span><span class="sep">›</span>
+          <span class="crumb">Videos</span><span class="sep">›</span>
+          <span class="crumb cur">Clips</span>
+        </div>
         <div class="mock-body">
           <div class="filelist">
             <div class="fl-head"><span></span><span>Name ▲</span><span>Date</span><span class="num">Size</span></div>
-            <div class="fl-row"><span class="thumb fld">📁</span><span>Keepers</span><span class="muted">2026-07-02</span><span class="num muted">—</span></div>
+            <div class="fl-row"><span class="thumb fld">📁</span><span>Keepers</span><span class="muted">2026-07-02</span><span class="num">2.4 GB</span></div>
+            <div class="fl-row"><span class="thumb fld">📁</span><span>Raw dump</span><span class="muted">2026-07-05</span><span class="num muted">870 MB…</span></div>
             <div class="fl-row"><span class="thumb img">🖼</span><span class="name-cell"><span>screenshot 2026-07-04.png</span><span class="flag keep">✓ keep</span></span><span class="muted">07-04 14:22</span><span class="num">1.2 MB</span></div>
             <div class="fl-row sel"><span class="thumb aud">🔊</span><span>voice-memo.m4a</span><span class="muted">07-05 09:10</span><span class="num">4.8 MB</span></div>
             <div class="fl-row"><span class="thumb vid">🎬</span><span class="name-cell"><span>clip_0421.mp4</span><span class="flag reject">✗ reject</span></span><span class="muted">07-05 18:03</span><span class="num">88 MB</span></div>
@@ -401,9 +421,9 @@
     <!-- Triage demo -->
     <section id="triage">
       <div class="wrap">
-        <h2>Swipe. Swipe. Done.</h2>
-        <p class="sub">Sort a folder like a dating app — keep the good, reject the junk. Nothing happens to your files until you've reviewed both piles and applied them with one click. Anything you skip stays untouched.</p>
-        <div class="mock tr-mock tr-anim" role="img" aria-label="Animation of triage mode: file cards swipe right to keep and left to reject with stamps, counters tick up, then a review screen applies the changes — the reject flies into the Recycle Bin, and Ctrl+Z can undo everything.">
+        <h2>Swipe through a folder</h2>
+        <p class="sub">Sort a folder like a dating app: keep the good, reject the junk. Nothing happens to your files until you have reviewed both piles and applied them with one click. Anything you skip stays untouched.</p>
+        <div class="mock tr-mock tr-anim" role="img" aria-label="Animation of triage mode: file cards swipe right to keep and left to reject with stamps, counters tick up, then a review screen applies the changes. The reject flies into the Recycle Bin, and Ctrl+Z can undo everything.">
           <div class="mock-bar">
             <span class="app-ic">🧹</span>
             <span class="title">Explorer Helper — Triage</span>
@@ -435,7 +455,7 @@
               <div class="tr-done">
                 <div>
                   <div class="big">All caught up ✓</div>
-                  <div class="sub2">2 keep · 1 reject — take one last look</div>
+                  <div class="sub2">2 keep · 1 reject · take one last look</div>
                 </div>
               </div>
             </div>
@@ -461,7 +481,7 @@
             </div>
           </div>
         </div>
-        <p class="tr-hints">Drag with the mouse or fly with the keyboard — <kbd>←</kbd> reject · <kbd>→</kbd> keep · <kbd>↓</kbd> skip · <kbd>Backspace</kbd> rewind.</p>
+        <p class="tr-hints">Drag with the mouse, or stay on the keyboard: <kbd>←</kbd> reject · <kbd>→</kbd> keep · <kbd>↓</kbd> skip · <kbd>Backspace</kbd> rewind.</p>
       </div>
     </section>
 
@@ -470,21 +490,24 @@
     <!-- Features -->
     <section id="features">
       <div class="wrap">
-        <h2>Everything you need to triage a folder</h2>
-        <p class="sub">Previews, filters, and keyboard-first flows. Your files never leave your machine; the only network call is the update check, which you can switch off in Settings.</p>
+        <h2>What it does</h2>
+        <p class="sub">Previews, filters, folder sizes, and keyboard-first flows. Your files stay on your machine; the only network call is the update check, which you can switch off in Settings.</p>
         <div class="grid">
-          <div class="card"><div class="ic">🃏</div><h3>Swipe-to-triage</h3><p>The fastest way to clear out a folder: review files one at a time like a dating app — swipe or <kbd>←</kbd>/<kbd>→</kbd> to reject or keep, <kbd>↓</kbd> to skip. Nothing touches the disk until you <strong>Commit</strong>: a review screen shows both piles so you can swap or unmark any file, then you choose what happens — send rejects to the Recycle Bin or leave them alone, and move <em>or</em> copy the keepers to a folder of your choice. One <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the whole commit.</p></div>
+          <div class="card"><div class="ic">🃏</div><h3>Swipe-to-triage</h3><p>Review files one at a time like a dating app: swipe or <kbd>←</kbd>/<kbd>→</kbd> to reject or keep, <kbd>↓</kbd> to skip. Nothing touches the disk until you <strong>Commit</strong>. A review screen shows both piles so you can swap or unmark any file, then you choose what happens: send rejects to the Recycle Bin or leave them alone, and move <em>or</em> copy the keepers to a folder of your choice. One <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the whole commit.</p></div>
           <div class="card"><div class="ic">🖱️</div><h3>Explorer context menu</h3><p>“Clean this folder” on folders and folder backgrounds. Per-user, no admin required.</p></div>
+          <div class="card"><div class="ic">🧭</div><h3>Browse in place</h3><p><kbd>Enter</kbd> or double-click a folder to go into it, with back, forward and up buttons, a clickable breadcrumb, and <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd>/<kbd>↑</kbd> on the keyboard. Step up and back down and you land on the file you left.</p></div>
+          <div class="card"><div class="ic">🏁</div><h3>Marks that span folders</h3><p>Keep and reject decisions follow you from folder to folder. A toolbar pill counts what is still pending, and the commit dialog breaks it down per folder so you can apply everything at once or only the folder you are in.</p></div>
+          <div class="card"><div class="ic">📏</div><h3>Folder sizes</h3><p>The Size column shows what each subfolder holds, counted in the background so a big tree ticks upward instead of sitting blank. Sort by Size to put the heaviest folders on top, which is usually where the cleaning starts.</p></div>
           <div class="card"><div class="ic">👁️</div><h3>Live previews</h3><p>Images render natively, video and audio play inline, and PDFs open in the built-in viewer.</p></div>
           <div class="card"><div class="ic">⏱️</div><h3>Scrub timeline</h3><p>Video previews come with play/pause, elapsed and total time, and a draggable slider to jump anywhere in the clip.</p></div>
-          <div class="card"><div class="ic">📋</div><h3>Preview details</h3><p>A strip under the preview surfaces the selected file’s metadata — type, size, resolution, length, frame rate, bit rate, created/modified dates. Toggle each one on or off in Settings.</p></div>
+          <div class="card"><div class="ic">📋</div><h3>Preview details</h3><p>A strip under the preview shows the selected file’s metadata: type, size, resolution, length, frame rate, bit rate, created and modified dates. Select a folder and it shows how many items are inside. Toggle each one on or off in Settings.</p></div>
           <div class="card"><div class="ic">⚡</div><h3>Quick rename</h3><p>Type a name, press <kbd>Enter</kbd>, jump to the next file. Collisions auto-number (<code>Clip</code>, <code>Clip 2</code>…) and the extension is preserved.</p></div>
-          <div class="card"><div class="ic">🏷️</div><h3>Quick-use buttons</h3><p>Build a name in one click from your own reusable buttons, plus dynamic buttons for today’s date or the file’s created date — formats configurable in Settings.</p></div>
-          <div class="card"><div class="ic">⌨️</div><h3>Keyboard-first</h3><p><kbd>Del</kbd> to Recycle Bin, <kbd>F2</kbd> rename, <kbd>Enter</kbd> open, <kbd>K</kbd>/<kbd>X</kbd>/<kbd>U</kbd> flag — fly through a folder without the mouse.</p></div>
-          <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p>Renamed, deleted, or committed the wrong thing? <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back — files come straight out of the Recycle Bin.</p></div>
-          <div class="card"><div class="ic">🔠</div><h3>Filter &amp; sort</h3><p>Filter by name and toggle file types on or off. Sort by name, size, date, or type — folders always first.</p></div>
+          <div class="card"><div class="ic">🏷️</div><h3>Quick-use buttons</h3><p>Build a name in one click from your own reusable buttons, plus dynamic buttons for today’s date or the file’s created date. Both formats are configurable in Settings.</p></div>
+          <div class="card"><div class="ic">⌨️</div><h3>Keyboard-first</h3><p><kbd>Del</kbd> to Recycle Bin, <kbd>F2</kbd> rename, <kbd>Enter</kbd> open, <kbd>K</kbd>/<kbd>X</kbd>/<kbd>U</kbd> flag, <kbd>Alt</kbd>+arrows to move between folders. A whole pass without the mouse.</p></div>
+          <div class="card"><div class="ic">↩️</div><h3>One-key undo</h3><p><kbd>Ctrl</kbd>+<kbd>Z</kbd> puts back the last rename, delete, or commit. Files come straight out of the Recycle Bin, with no digging through it yourself.</p></div>
+          <div class="card"><div class="ic">🔠</div><h3>Filter &amp; sort</h3><p>Filter by name and toggle file types on or off. Sort by name, size, date, or type, with folders always first.</p></div>
           <div class="card"><div class="ic">🗑️</div><h3>Safe by default</h3><p>Deletes go to the Recycle Bin, never a permanent wipe. Multi-select to clear several at once.</p></div>
-          <div class="card"><div class="ic">🔄</div><h3>Always up to date</h3><p>When a new release ships, an update button appears in the toolbar — on an installed copy, one click downloads it, installs silently, and restarts the app right where you were. The portable build opens the release page instead. Toggleable in Settings.</p></div>
+          <div class="card"><div class="ic">🔄</div><h3>Always up to date</h3><p>When a new release ships, an update button appears in the toolbar. On an installed copy, one click downloads it, installs silently, and restarts the app right where you were. The portable build opens the release page instead. Toggleable in Settings.</p></div>
         </div>
       </div>
     </section>
@@ -494,13 +517,13 @@
     <!-- How it works -->
     <section id="how">
       <div class="wrap">
-        <h2>From cluttered to clean in four steps</h2>
-        <p class="sub">No setup rituals — it lives in the menu you already use.</p>
+        <h2>How a pass goes</h2>
+        <p class="sub">It lives in the menu you already use, with nothing to set up first.</p>
         <div class="steps">
           <div class="step"><h3>Right-click a folder</h3><p>Pick <strong>Clean this folder</strong> from the Explorer context menu (or the background of an open folder).</p></div>
-          <div class="step"><h3>Swipe through it</h3><p>Preview each file and flag it keep or reject — swipe, <kbd>←</kbd>/<kbd>→</kbd>, or <kbd>K</kbd>/<kbd>X</kbd>. Rename a run of clips with <kbd>Enter</kbd> along the way.</p></div>
+          <div class="step"><h3>Swipe through it</h3><p>Preview each file and flag it keep or reject, by swipe, <kbd>←</kbd>/<kbd>→</kbd>, or <kbd>K</kbd>/<kbd>X</kbd>. Step into a subfolder and keep going; the marks come with you. Rename a run of clips with <kbd>Enter</kbd> along the way.</p></div>
           <div class="step"><h3>Commit once</h3><p>Review both piles, then <strong>Commit</strong>: send rejects to the Recycle Bin (or leave them), and move or copy the keepers to a folder you choose.</p></div>
-          <div class="step"><h3>Undo mistakes</h3><p>Changed your mind? <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the last rename, delete, or the whole commit — no digging required.</p></div>
+          <div class="step"><h3>Undo mistakes</h3><p><kbd>Ctrl</kbd>+<kbd>Z</kbd> reverses the last rename, delete, or the whole commit, however many files it covered.</p></div>
         </div>
       </div>
     </section>
@@ -515,9 +538,9 @@
         <div class="install-grid">
           <div class="install-card">
             <h3>⬇ Installer (recommended)</h3>
-            <p class="muted">Download <code>ExplorerHelper-Setup-*.exe</code> from the latest release and run it. It installs per-user (no admin prompt) and registers the context-menu entries. Uninstalling removes them again — and from here the app keeps itself up to date with one-click updates.</p>
+            <p class="muted">Download <code>ExplorerHelper-Setup-*.exe</code> from the latest release and run it. It installs per-user (no admin prompt) and registers the context-menu entries. Uninstalling removes them again. From here the app keeps itself up to date with one-click updates.</p>
             <p><a class="btn btn-primary" href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Download latest release</a></p>
-            <p class="muted" style="font-size:.85rem">A portable zip is published with every release too — use the <strong>Add context menu</strong> button inside the app. The portable build points you at the release page for updates rather than installing them itself.</p>
+            <p class="muted" style="font-size:.85rem">A portable zip is published with every release too; use the <strong>Add context menu</strong> button inside the app. The portable build points you at the release page for updates rather than installing them itself.</p>
           </div>
           <div class="install-card">
             <h3>🛠 Build from source</h3>
@@ -526,13 +549,14 @@
 dotnet run --project src/ExplorerHelper
 
 # Publish self-contained exe + portable zip
-./build.ps1 -Version 0.5.0</code></pre>
+# (version comes from Directory.Build.props)
+./build.ps1</code></pre>
           </div>
         </div>
         <div class="callout">
           <strong>Windows 11 note:</strong> the entry appears under <strong>Show more options</strong> (the classic menu),
           or immediately when you <kbd>Shift</kbd>+right-click. For a top-level entry (no “Show more options” detour),
-          build the sparse MSIX package — see <a href="https://github.com/JacobPoteet/ExplorerHelper/blob/main/packaging/README.md">packaging/README.md</a>.
+          build the sparse MSIX package. See <a href="https://github.com/JacobPoteet/ExplorerHelper/blob/main/packaging/README.md">packaging/README.md</a>.
         </div>
       </div>
     </section>
@@ -540,7 +564,7 @@ dotnet run --project src/ExplorerHelper
 
   <footer>
     <div class="wrap footer-inner">
-      <div>🧹 <strong>Explorer Helper</strong> — MIT licensed. Made by <a href="https://github.com/JacobPoteet">Jacob Poteet</a>.</div>
+      <div>🧹 <strong>Explorer Helper</strong>. MIT licensed, made by <a href="https://github.com/JacobPoteet">Jacob Poteet</a>.</div>
       <div>
         <a href="https://github.com/JacobPoteet/ExplorerHelper">GitHub</a> ·
         <a href="https://github.com/JacobPoteet/ExplorerHelper/releases/latest">Releases</a> ·
