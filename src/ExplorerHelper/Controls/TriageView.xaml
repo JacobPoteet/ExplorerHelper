@@ -322,7 +322,7 @@
 
             <DockPanel Grid.Row="3" Margin="16,10,16,12">
                 <ui:Button x:Name="CommitButton" DockPanel.Dock="Right" Appearance="Primary"
-                           Content="Commit…" Click="Commit_Click" />
+                           Content="Commit" Click="Commit_Click" />
                 <TextBlock Text="Nothing touches the disk until you commit — rejects go to the Recycle Bin, and one Ctrl+Z brings the whole commit back."
                            VerticalAlignment="Center" FontSize="11" TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource TextFillColorTertiaryBrush}" />

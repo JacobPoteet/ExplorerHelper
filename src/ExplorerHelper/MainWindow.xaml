@@ -152,8 +152,10 @@
                            Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibility}}"
                            ToolTip="A new version is ready — click to update; the app restarts on this folder" />
                 <!-- Pending marks (issue #43): marks survive navigation now, so this stays put
-                     while you browse. Without it you can commit a reject made six folders ago. -->
-                <Border Margin="0,0,12,0" Padding="10,4" CornerRadius="12"
+                     while you browse. Without it you can commit a reject made six folders ago.
+                     It also carries the commit action: marks are made from the list as often as
+                     from the deck, so this is where a keyboard triage run has to be able to end. -->
+                <Border Margin="0,0,12,0" Padding="8,3" CornerRadius="14"
                         VerticalAlignment="Center"
                         Background="{DynamicResource ControlFillColorSecondaryBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
@@ -161,14 +163,45 @@
                         ToolTip="Uncommitted keep/reject marks. They follow you between folders until you commit or discard them."
                         Visibility="{Binding HasPendingMarks, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding PendingMarksSummary}" FontSize="12"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <Button Content="Discard" Click="DiscardMarks_Click" Margin="8,0,0,0"
+                        <TextBlock Text="{Binding KeepCount, StringFormat=&#10003; {0}}" FontSize="12"
+                                   VerticalAlignment="Center" FontWeight="SemiBold"
+                                   Foreground="{StaticResource KeepBrush}" />
+                        <TextBlock Text="{Binding RejectCount, StringFormat=&#10007; {0}}" FontSize="12"
+                                   Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"
+                                   Foreground="{StaticResource RejectBrush}" />
+                        <TextBlock Text="{Binding PendingScopeSummary}" FontSize="12"
+                                   Margin="8,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Visibility="{Binding MarksSpanFolders, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Content="Review" Click="ReviewMarks_Click" Margin="10,0,0,0"
                                 Padding="6,0" Background="Transparent" BorderThickness="0"
-                                FontSize="11" Cursor="Hand"
-                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                ToolTip="Clear every pending mark without touching the disk" />
+                                FontSize="12" Cursor="Hand"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                ToolTip="Open both piles to check them before committing" />
+                        <!-- A pill-shaped button needs horizontal padding wider than its corner
+                             radius, or the text starts where the background has already curved
+                             away and reads as overflowing its own shape. -->
+                        <ui:Button Content="Commit" Appearance="Primary" Margin="8,0,0,0"
+                                   Padding="14,4" FontSize="12" CornerRadius="12"
+                                   Click="CommitMarks_Click"
+                                   ToolTip="Apply the pending marks: recycle rejects, move or copy keepers (Ctrl+Enter)" />
+                        <ToggleButton x:Name="MarksMoreButton" Content="&#8943;" Margin="4,0,0,0"
+                                      Padding="6,0" MinWidth="0" Background="Transparent"
+                                      BorderThickness="0" FontSize="13" Cursor="Hand"
+                                      Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                      ToolTip="More actions for the pending marks" />
+                        <Popup PlacementTarget="{Binding ElementName=MarksMoreButton}" Placement="Bottom"
+                               StaysOpen="False" AllowsTransparency="True"
+                               IsOpen="{Binding IsChecked, ElementName=MarksMoreButton, Mode=TwoWay}">
+                            <Border Background="{DynamicResource ApplicationBackgroundBrush}"
+                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="8" Padding="6" Margin="0,6,0,0">
+                                <ui:Button Content="Discard marks" Click="DiscardMarks_Click"
+                                           Appearance="Transparent" HorizontalAlignment="Stretch"
+                                           Icon="{ui:SymbolIcon Dismiss24}"
+                                           ToolTip="Clear every pending mark without touching the disk" />
+                            </Border>
+                        </Popup>
                     </StackPanel>
                 </Border>
                 <ui:Button Appearance="Primary"
@@ -668,6 +701,10 @@
                     <TextBlock Style="{StaticResource KbdText}" Text="U" />
                 </Border>
                 <TextBlock Style="{StaticResource KbdLabel}" Text="unmark" Margin="5,0,0,0" />
+                <Border Style="{StaticResource KbdChip}">
+                    <TextBlock Style="{StaticResource KbdText}" Text="Ctrl+Enter" />
+                </Border>
+                <TextBlock Style="{StaticResource KbdLabel}" Text="commit" Margin="5,0,0,0" />
             </StackPanel>
             <TextBlock Text="{Binding StatusText}" FontSize="12"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
