@@ -49,6 +49,13 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             FileList.Focus();
         };
 
+        // Ctrl+Enter ends a keyboard triage run without reaching for the mouse. It lives on the
+        // window, not FileList_KeyDown, so it still works from the filter box or the rename bar.
+        InputBindings.Add(new KeyBinding(
+            new CommunityToolkit.Mvvm.Input.RelayCommand(CommitMarks, () => _vm.HasPendingMarks),
+            Key.Enter,
+            ModifierKeys.Control));
+
         UpdateSortIndicators();
         RefreshDynamicButtons(null); // seed the "today" button label before any file is selected
     }
@@ -194,12 +201,39 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         FocusList();
     }
 
+    // --- Pending marks (toolbar pill) ------------------------------------------------
+
+    /// <summary>
+    /// Commits from the list, without a detour through the deck. Marking is a list gesture
+    /// (K/X/U) as much as a deck one, so the commit has to be reachable from here too.
+    /// </summary>
+    private void CommitMarks()
+    {
+        if (!_vm.HasPendingMarks)
+            return;
+        TriageCommitFlow.Run(_vm, this, Preview.Clear, () =>
+        {
+            Preview.Show(_vm.SelectedFile); // the commit reloaded the folder; put the pane back
+            FocusList();
+        });
+    }
+
+    private void CommitMarks_Click(object sender, RoutedEventArgs e) => CommitMarks();
+
+    /// <summary>Opens the overlay straight onto the piles, skipping the card deck.</summary>
+    private void ReviewMarks_Click(object sender, RoutedEventArgs e)
+    {
+        Preview.Clear(); // the review screen owns the (single) live media handle from here
+        TriageOverlay.Open(_vm, startInReview: true);
+    }
+
     /// <summary>
     /// Throws away every pending mark. Marks span folders now, so confirm with the count: the
     /// user may be discarding decisions made somewhere they can't currently see (issue #43).
     /// </summary>
     private void DiscardMarks_Click(object sender, RoutedEventArgs e)
     {
+        MarksMoreButton.IsChecked = false;
         var answer = MessageBox.Show(
             this,
             $"Discard {_vm.PendingMarksSummary}?\n\nNothing on disk changes — only the pending "

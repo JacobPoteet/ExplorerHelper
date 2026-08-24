@@ -328,9 +328,16 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Files currently flagged Reject, folder then name.</summary>
     public ObservableCollection<FileEntry> RejectPile { get; } = [];
 
-    /// <summary>Toolbar text while marks are pending, e.g. "37 marks in 5 folders".</summary>
+    /// <summary>
+    /// Plain-language count of everything pending, e.g. "37 marks in 5 folders". The pill shows
+    /// the keep/reject split instead; this wording is what the discard confirmation reads back.
+    /// </summary>
     [ObservableProperty]
     private string _pendingMarksSummary = string.Empty;
+
+    /// <summary>Pill suffix naming the spread, e.g. "in 5 folders". Empty while marks are local.</summary>
+    [ObservableProperty]
+    private string _pendingScopeSummary = string.Empty;
 
     /// <summary>
     /// True while uncommitted marks exist, showing the toolbar pill. Marks now accumulate across
@@ -359,6 +366,19 @@ public partial class MainViewModel : ObservableObject
             g.Count(e => e.Flag == TriageFlag.Keep),
             g.Count(e => e.Flag == TriageFlag.Reject)))
         .ToList();
+
+    /// <summary>
+    /// Reject/keep counts and sizes for a commit scope, so the commit dialog can rewrite its
+    /// cards when the user narrows to the current folder. Reads the session directly rather than
+    /// re-filtering the piles at the call site, which is how the deck and the toolbar stay in step.
+    /// </summary>
+    public (int RejectCount, long RejectBytes, int KeepCount, long KeepBytes) TotalsFor(bool currentFolderOnly)
+    {
+        var scope = currentFolderOnly ? FolderPath : null;
+        var rejects = _triage.Pending(TriageFlag.Reject, scope);
+        var keeps = _triage.Pending(TriageFlag.Keep, scope);
+        return (rejects.Count, rejects.Sum(e => e.SizeBytes), keeps.Count, keeps.Sum(e => e.SizeBytes));
+    }
 
     [ObservableProperty]
     private int _keepCount;
@@ -738,6 +758,7 @@ public partial class MainViewModel : ObservableObject
         PendingMarksSummary = folders > 1
             ? $"{total} mark{(total == 1 ? "" : "s")} in {folders} folders"
             : $"{total} mark{(total == 1 ? "" : "s")}";
+        PendingScopeSummary = folders > 1 ? $"in {folders} folders" : string.Empty;
         UpdatePileGrouping();
         UpdateStatus();
     }

@@ -43,7 +43,7 @@ public partial class TriageView : UserControl
     /// (filtered, sorted) file list — folders never get cards. Starts at the first unmarked
     /// file so a resumed session picks up where it left off.
     /// </summary>
-    public void Open(MainViewModel vm)
+    public void Open(MainViewModel vm, bool startInReview = false)
     {
         _vm = vm;
         _deck = vm.Files.Where(f => !f.IsDirectory).ToList();
@@ -51,7 +51,12 @@ public partial class TriageView : UserControl
         _index = _deck.FindIndex(f => f.Flag == TriageFlag.None);
 
         Visibility = Visibility.Visible;
-        ShowDeckState();
+        // Marks made in the list have no deck behind them, so the toolbar opens straight onto the
+        // piles; "Back to deck" still works because the deck was snapshotted above either way.
+        if (startInReview)
+            ShowReviewState();
+        else
+            ShowDeckState();
         Focus();
     }
 
@@ -339,7 +344,7 @@ public partial class TriageView : UserControl
         UnmarkedStrip.Visibility = _vm.UnmarkedFileCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         UnmarkedText.Text = $"{_vm.UnmarkedFileCount} file(s) not decided yet — they stay untouched unless you keep going.";
         CommitButton.IsEnabled = _vm.KeepCount + _vm.RejectCount > 0;
-        CommitButton.Content = $"Commit  (✗ {_vm.RejectCount} reject · ✓ {_vm.KeepCount} keep)…";
+        CommitButton.Content = $"Commit  (✗ {_vm.RejectCount} reject · ✓ {_vm.KeepCount} keep)";
     }
 
     private static FileEntry? EntryOf(object sender) =>
@@ -373,42 +378,8 @@ public partial class TriageView : UserControl
 
     private void Commit_Click(object sender, RoutedEventArgs e)
     {
-        // Marks can span folders now (issue #43), so the dialog gets the per-folder breakdown and
-        // a way to recompute its totals when the user narrows the scope.
-        var dialog = new CommitDialog(
-            _vm.SummarizeMarksByFolder(),
-            _vm.FolderPath,
-            onlyHere =>
-            {
-                var rejects = _vm.RejectPile.Where(f => InScope(f, onlyHere)).ToList();
-                var keeps = _vm.KeepPile.Where(f => InScope(f, onlyHere)).ToList();
-                return (rejects.Count, rejects.Sum(f => f.SizeBytes),
-                        keeps.Count, keeps.Sum(f => f.SizeBytes));
-            })
-        {
-            Owner = Window.GetWindow(this),
-        };
-        if (dialog.ShowDialog() != true)
-            return;
-        var destination = dialog.KeepDestination;
-        var copyKeepers = dialog.CopyKeepers;
-        var deleteRejects = dialog.DeleteRejects;
-        var currentFolderOnly = dialog.CurrentFolderOnly;
-
-        bool InScope(Models.FileEntry entry, bool onlyHere) =>
-            !onlyHere || string.Equals(
-                Services.TriageSession.FolderOf(entry), _vm.FolderPath, StringComparison.OrdinalIgnoreCase);
-
-        // Release every preview handle, then let the dispatcher pump the media teardown
-        // before files start moving — same discipline as delete/rename (issue #1).
-        CardPreview.Clear();
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
-        {
-            var error = _vm.CommitTriage(destination, copyKeepers, deleteRejects, currentFolderOnly);
-            if (error is not null)
-                MessageBox.Show(Window.GetWindow(this)!, error, "Commit finished with errors",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-            Close();
-        }));
+        // The dialog, the handle release and the commit itself are shared with the toolbar's
+        // pending-marks pill; the overlay only adds closing itself afterwards.
+        TriageCommitFlow.Run(_vm, Window.GetWindow(this)!, CardPreview.Clear, Close);
     }
 }
