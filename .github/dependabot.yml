@@ -1,0 +1,46 @@
+# Dependabot keeps the two things this repo pulls from outside up to date: the NuGet
+# packages the app references and the GitHub Actions the workflows call.
+#
+# Every PR it opens runs ci.yml (which triggers on pull_request), so a bump that breaks
+# the publish path shows up as a red build rather than reaching main.
+version: 2
+
+updates:
+  # NuGet. Scans from the root, so it picks up src/ExplorerHelper (the only project with
+  # PackageReferences today) and anything added later without a second entry here.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps
+    groups:
+      # Patch and minor bumps land as one PR a week; majors stay separate so a breaking
+      # change to WPF-UI or WebView2 gets reviewed on its own.
+      nuget-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci
+    groups:
+      actions-all:
+        patterns:
+          - "*"
