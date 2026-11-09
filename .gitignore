@@ -12,3 +12,6 @@ artifacts/
 # OS
 Thumbs.db
 desktop.ini
+
+# Local agent config: the wiki location never enters the repo
+.claude/*.local
