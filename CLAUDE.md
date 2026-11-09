@@ -40,7 +40,7 @@ src/ExplorerHelper/bin/Debug/net8.0-windows/ExplorerHelper.exe "C:\some\folder"
 ./release.ps1 -Version 0.7.0 -Tag
 ```
 
-There is **no test project**. Verify changes by driving the running app (see below).
+There is **no test project**. See "Verify a change".
 
 ## Architecture: where things live
 
@@ -83,6 +83,8 @@ Inside `src/ExplorerHelper`:
 
 ## Conventions that aren't obvious
 
+Subsystem rules live in `.claude/rules/` and load with the files they cover: `shell-interop.md`, `folder-stats.md`, `self-update.md` and `versioning.md`.
+
 - **Issue traceability:** features are annotated in code with `(issue #N)` comments. Match this
   when adding a feature that closes an issue.
 - **Preview file handles are released before disk ops.** A live `MediaElement`/WebView2 keeps the
@@ -94,42 +96,9 @@ Inside `src/ExplorerHelper`:
   see in a stack trace. Navigation is covered centrally: `MainViewModel.FolderChanging` fires
   before every folder switch and `MainWindow` clears the preview on it, so command-bound toolbar
   buttons and code-behind paths both release handles without each remembering to.
-- **The version lives in `Directory.Build.props` only** (issue #46). Both projects inherit it and
-  `build.ps1` defaults to it, so there is no second number to keep in step. The shell extension sat
-  at 0.1.0 for five releases because it had one. `release.yml` fails a tag that disagrees with the
-  props file, since a lagging version makes a build from source see the newer tag and show a
-  permanent "update available" pill (issue #33). Bump it with `./release.ps1` (see "Cutting a release"): its tag
-  step refuses until `main`'s props file carries the version, so the two can't drift apart. Note the declared version
-  never reaches a *released* binary: `build.ps1` passes `-p:Version` from the tag, which overrides
-  it. It only affects local builds.
 - **Settings persistence:** user prefs live in `AppSettings` → `%APPDATA%\ExplorerHelper\settings.json`.
   It's forgiving of missing/corrupt files (falls back to defaults) and `Normalized()` fills in
   nulls from older files. New persisted settings: add a property, default it, and normalize it.
-- **Shell interop needs backslash paths.** `SHCreateItemFromParsingName` /
-  `SHGetPropertyStoreFromParsingName` fail on forward-slash paths and return null. `FileEntry.FullPath`
-  (from `FileSystemInfo.FullName`) is already backslash; pass it through unchanged.
-- **PROPVARIANT interop** (`ShellPropertyService`): the struct uses two `IntPtr` union slots so it's
-  the right size on x86 and x64; values are coerced with the `propsys.dll` `PropVariantToXxx` helpers
-  rather than parsing the union by hand. Always `PropVariantClear` after reading.
-- **Background work** (thumbnails, media metadata, folder child counts) runs on `Task.Run` with a
-  `CancellationTokenSource` that's cancelled when the selection changes; results are marshalled back via
-  `Application.Current.Dispatcher` and dropped if the selection has moved on.
-- **Folder stats are two-tier** (`FolderScanService`, issue #40). Windows caches no folder size
-  (the shell property store returns nothing for `System.Size` on a directory), so every number costs
-  an enumeration. `MainViewModel.LoadFolderSizesInBackground` runs both phases after a load:
-  `CountChildren` (direct children, sub-millisecond) for every folder so the details panel has a
-  number immediately, then `Scan` (whole subtree) under a `MaxDegreeOfParallelism = 4`
-  `Parallel.ForEach`, reporting partial totals so the Size cell counts up instead of sitting blank.
-  Completed totals are cached for the session; `Invalidate` drops a path plus its ancestors and
-  descendants, and mutations (`Delete`, `CommitTriage`, `Undo`, `Refresh`) call it.
-  Two traps, both verified rather than assumed:
-    - `AttributesToSkip` filters entries found *during* enumeration, not the root you hand the
-      enumerator. `_allEntries` includes junctions, so the scan pass skips `IsReparsePoint`
-      folders itself; without that, the profile's `My Documents` junction double-counts `Documents`.
-    - `IgnoreInaccessible = true` makes .NET swallow a root it can't open *without* calling
-      `ContinueOnError`, so an unreadable folder reports zero entries and zero errors and renders
-      as "empty". Both option sets leave it off and count errors in the enumerator instead;
-      `FileEntry` shows "no access" for that case and "≥ 4.2 GB" for a partial total.
 - **Navigation** (issue #41) is a two-stack browser model on `MainViewModel`: `NavigateTo` pushes
   the current folder onto `_backStack` and clears `_forwardStack`; `NavigateBack`/`NavigateForward`
   move between them via `Step`. `LoadFolder` compares against the outgoing `FolderPath` to tell an
@@ -145,57 +114,14 @@ Inside `src/ExplorerHelper`:
   set is still pending). Because marks are now invisible from other folders, the toolbar pill
   (`HasPendingMarks`/`PendingMarksSummary`) and the commit dialog's per-folder breakdown are load-
   bearing, not decoration.
-- **Self-update** (`UpdateService`): a background check hits the GitHub releases API and, if a newer
-  tag exists, shows an update pill (wired through `MainViewModel`, gated by the `CheckForUpdates`
-  setting). `CheckForUpdateAsync` never throws: offline/rate-limited/malformed all read as "no
-  update". Only *installed* copies (detected via the Inno Setup per-user uninstall key,
-  `IsInstalledCopy()`) get the seamless silent-install-and-relaunch path; portable copies are sent
-  to the release page. Release tags and the `ExplorerHelper-Setup-*.exe` asset name are the contract
-  the check relies on, so keep them stable.
 
-## Verifying UI changes (drive the real app)
+## Verify a change
 
-Launch the exe with a folder containing relevant files, confirm it stays up (no crash / no error
-dialog), then screenshot. **Find the window rect dynamically**: the window gets moved between
-monitors and can sit at negative coordinates, so never hardcode positions or assume the primary
-screen. Capture the whole virtual desktop and crop to the window's `GetWindowRect`:
-
-```powershell
-Add-Type -AssemblyName System.Drawing,System.Windows.Forms
-Add-Type @"
-using System;using System.Runtime.InteropServices;
-public class Win {
-  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
-  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int c);
-  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; }
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
-}
-"@
-$p = Get-Process ExplorerHelper | Select-Object -First 1
-[Win]::ShowWindow($p.MainWindowHandle,9) | Out-Null      # SW_RESTORE
-[Win]::SetForegroundWindow($p.MainWindowHandle) | Out-Null
-Start-Sleep -Milliseconds 400
-$r = New-Object Win+RECT; [Win]::GetWindowRect($p.MainWindowHandle,[ref]$r) | Out-Null
-$vs = [System.Windows.Forms.SystemInformation]::VirtualScreen
-$full = New-Object System.Drawing.Bitmap $vs.Width,$vs.Height
-[System.Drawing.Graphics]::FromImage($full).CopyFromScreen($vs.Location,[System.Drawing.Point]::Empty,$vs.Size)
-$w=$r.R-$r.L; $h=$r.B-$r.T
-$crop = New-Object System.Drawing.Bitmap $w,$h
-[System.Drawing.Graphics]::FromImage($crop).DrawImage($full,
-  (New-Object System.Drawing.Rectangle 0,0,$w,$h),
-  (New-Object System.Drawing.Rectangle ($r.L-$vs.Left),($r.T-$vs.Top),$w,$h),
-  [System.Drawing.GraphicsUnit]::Pixel)
-$crop.Save("$env:TEMP\eh_shot.png")
-```
-
-Notes:
-- The file `ListView` is virtualized and **does not expose rows to UI Automation**, so select a file
-  with a real mouse click into the list + arrow keys (`SendKeys`) rather than `SelectionItemPattern`.
-- The details strip and video timeline only appear when a file is selected, so select one first.
-- `ffmpeg` is available for generating test media, e.g.
-  `ffmpeg -f lavfi -i testsrc=size=1280x720:rate=30 -t 3 -pix_fmt yuv420p test.mp4`.
-- To unit-test a `Services/*` interop file in isolation, a throwaway console csproj that
-  `<Compile Include>`s the single file (absolute path) is faster than launching the whole app.
+There is no test project. Build (`dotnet build ExplorerHelper.sln -c Debug`), then for a visual or
+UI change tell Jacob which screen and control to look at and what he should see, and let him review
+it in the running app. Do not launch, drive or screenshot the app unless he asks, and never stop
+or restart a copy he has running. When he asks, `.claude/rules/ui-verification.md` and
+`tools/Capture-Window.ps1` cover driving and capturing the window.
 
 ## CI
 
